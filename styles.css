@@ -130,10 +130,13 @@ td.dash{color:#bbb;}
 #toast.ok{background:#1e8449;}
 #toast.err{background:#c0392b;}
 
+
+
 /* ── Login Screen ── */
 
 
 .login-container {
+    position: fixed;
   height: 100vh;
   display: flex;
   justify-content: center;
