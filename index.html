@@ -30,15 +30,22 @@
 
 </div>
 
-<div id="appContent" style="display:none;"> <!-- hidden tab code start -->
+<div id="appContent"> <!-- hidden tab code start -->
 
 
 <header>
   <div class="header-inner">
     <div class="logo">🏭 HR Dashboard System</div>
-    <div id="db-badge" class="db-badge connecting">⏳ Connecting…</div>
-    <div class="hclock" id="clock"></div>
+
+    <div class="header-right">
+      <div id="db-badge" class="db-badge connecting">⏳ Connecting…</div>
+      <div class="hclock" id="clock"></div>
+
+      <!-- 👇 Logout button under clock -->
+      <button onclick="logout()" class="logout-btn">🚪 Logout</button>
+    </div>
   </div>
+
   <div class="tabs">
     <button class="tab active" onclick="switchTab('entry',this)">📝 Data Entry</button>
     <button class="tab" onclick="switchTab('dashboard',this)">📊 Dashboard</button>
@@ -85,7 +92,7 @@
         </div>
 
         <!-- Biscuit type: hidden unless biscuit selected -->
-        <div class="field" id="field-biscuitCode" style="display:none;">
+        <div class="field" id="field-biscuitCode">
           <label>Biscuit Type</label>
           <select id="e-biscuitCode">
             <option value="">— select —</option>
@@ -99,7 +106,7 @@
         </div>
 
         <!-- Qty: hidden until item selected -->
-        <div class="field" id="field-qty" style="display:none;">
+        <div class="field" id="field-qty">
           <label>Qty</label>
           <input type="number" id="e-qty" min="0" value="0"/>
         </div>

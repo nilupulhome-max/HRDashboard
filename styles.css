@@ -134,15 +134,24 @@ td.dash{color:#bbb;}
 
 /* ── Login Screen ── */
 
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
 
 .login-container {
-    position: fixed;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
   height: 100vh;
+
   display: flex;
   justify-content: center;
   align-items: center;
+
   background: linear-gradient(135deg, #1e3c72, #2a5298);
-  font-family: Arial, sans-serif;
 }
 
 .login-card {
@@ -201,4 +210,37 @@ td.dash{color:#bbb;}
   margin-top: 10px;
   font-size: 13px;
   color: red;
+}
+
+/* ── header ── */
+.header-inner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.header-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 5px;
+}
+
+.hclock {
+  font-weight: bold;
+  font-size: 14px;
+}
+
+.logout-btn {
+  background: #e74c3c;
+  color: white;
+  border: none;
+  padding: 5px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.logout-btn:hover {
+  background: #c0392b;
 }

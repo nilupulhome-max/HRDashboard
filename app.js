@@ -22,8 +22,24 @@ async function login() {
   }
 }
 // ── Logout ────────────────────────────────────────────────────
+
 function logout() {
-  auth.signOut();
+  auth.signOut().then(() => {
+    // Reset to login screen
+    document.getElementById('loginScreen').style.display = 'flex';
+    document.getElementById('appContent').style.display  = 'none';
+
+    // Clear login message
+    document.getElementById('loginMsg').textContent = '';
+
+    // Switch back to entry tab so next login starts fresh
+    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+    document.getElementById('tab-entry').classList.add('active');
+    document.querySelector('.tab').classList.add('active');
+  }).catch(e => {
+    toast('Logout error: ' + e.message, true);
+  });
 }
 
 auth.onAuthStateChanged(user => {
@@ -31,7 +47,7 @@ auth.onAuthStateChanged(user => {
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('appContent').style.display = 'block';
   } else {
-    document.getElementById('loginScreen').style.display = 'block';
+    document.getElementById('loginScreen').style.display = 'flex';
     document.getElementById('appContent').style.display = 'none';
   }
 });
@@ -54,6 +70,9 @@ document.getElementById('e-shift').addEventListener('change', async () => {
   await loadEntryForm();
 });
 
+// ── Wire listeners load mnpower ot ────────────────────────────────────────────
+document.getElementById('mp-date').addEventListener('change',  loadManpower);
+document.getElementById('mp-shift').addEventListener('change', loadManpower);
 
 // ── Tab switching ─────────────────────────────────────────────
 function switchTab(name, btn) {
@@ -152,6 +171,53 @@ async function loadEntryForm() {
   }
 }
 
+async function loadManpower() {
+  const date  = document.getElementById('mp-date').value;
+  const shift = document.getElementById('mp-shift').value;
+
+  if (!date || !shift) return;
+
+  try {
+    const doc = await db.collection('manpower').doc(`${date}_${shift}`).get();
+
+    if (!doc.exists) {
+      document.getElementById('mp-cost').value    = 0;
+      document.getElementById('mp-otHours').value = 0;
+      updateOTCost();
+      return;
+    }
+
+    const data = doc.data();
+    document.getElementById('mp-cost').value    = data.manpowerCost || 0;
+    document.getElementById('mp-otHours').value = data.otHours      || 0;
+    updateOTCost();
+
+  } catch (e) {
+    toast('Error loading manpower: ' + e.message, true);
+  }
+}
+// ── Live OT cost preview ──────────────────────────────────────
+function updateOTCost() {
+  const hours   = parseFloat(document.getElementById('mp-otHours').value) || 0;
+  const otTotal = Math.round(hours * COSTS.otRate);
+  const el      = document.getElementById('mp-otCost');
+  if (el) el.textContent = hours > 0 ? `OT Cost: Rs ${otTotal.toLocaleString()}` : '';
+}
+
+document.getElementById('mp-otHours').addEventListener('input', updateOTCost);
+document.getElementById('mp-date').addEventListener('change',   loadManpower);
+document.getElementById('mp-shift').addEventListener('change',  loadManpower);
+// ── Live OT cost preview ──────────────────────────────────────
+function updateOTCost() {
+  const hours   = parseFloat(document.getElementById('mp-otHours').value) || 0;
+  const otTotal = Math.round(hours * COSTS.otRate);
+  const el      = document.getElementById('mp-otCost');
+  if (el) el.textContent = hours > 0 ? `OT Cost: Rs ${otTotal.toLocaleString()}` : '';
+}
+
+document.getElementById('mp-otHours').addEventListener('input', updateOTCost);
+document.getElementById('mp-date').addEventListener('change',   loadManpower);
+document.getElementById('mp-shift').addEventListener('change',  loadManpower);
 // ── Supplier → allowed items map ──────────────────────────────
 const supplierItems = {
   "MC Caters":      ["teaQty", "plainTeaQty", "biscuit"],
