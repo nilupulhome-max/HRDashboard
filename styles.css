@@ -129,3 +129,73 @@ td.dash{color:#bbb;}
 #toast.show{transform:translateY(0);opacity:1;}
 #toast.ok{background:#1e8449;}
 #toast.err{background:#c0392b;}
+
+/* ── Login Screen ── */
+
+
+.login-container {
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: linear-gradient(135deg, #1e3c72, #2a5298);
+  font-family: Arial, sans-serif;
+}
+
+.login-card {
+  background: #fff;
+  padding: 40px;
+  border-radius: 16px;
+  width: 320px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+  text-align: center;
+}
+
+.login-card h2 {
+  margin-bottom: 5px;
+  color: #2a5298;
+}
+
+.subtitle {
+  font-size: 13px;
+  color: #777;
+  margin-bottom: 20px;
+}
+
+.login-card input {
+  width: 100%;
+  padding: 12px;
+  margin: 10px 0;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  outline: none;
+  transition: 0.2s;
+}
+
+.login-card input:focus {
+  border-color: #2a5298;
+  box-shadow: 0 0 5px rgba(42,82,152,0.3);
+}
+
+.login-card button {
+  width: 100%;
+  padding: 12px;
+  background: #2a5298;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: bold;
+  margin-top: 10px;
+  transition: 0.2s;
+}
+
+.login-card button:hover {
+  background: #1e3c72;
+}
+
+#loginMsg {
+  margin-top: 10px;
+  font-size: 13px;
+  color: red;
+}

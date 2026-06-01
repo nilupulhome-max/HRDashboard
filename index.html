@@ -14,16 +14,20 @@
 <body>
 
   <!-- Login -->
-<div id="loginScreen" style="display:none; padding:40px; text-align:center;">
-  <h2>HR Canteen Login</h2>
+<div id="loginScreen" class="login-container" style="display:none;">
 
-  <input id="email" type="email" placeholder="Email" />
-  <br/><br/>
-  <input id="password" type="password" placeholder="Password" />
-  <br/><br/>
+  <div class="login-card">
+    <h2>🍽️ HR Dashboard Login</h2>
+    <p class="subtitle">Sign in to continue</p>
 
-  <button onclick="login()">Login</button>
-  <p id="loginMsg"></p>
+    <input id="email" type="email" placeholder="Email" />
+    <input id="password" type="password" placeholder="Password" />
+
+    <button onclick="login()">Login</button>
+
+    <p id="loginMsg"></p>
+  </div>
+
 </div>
 
 <div id="appContent" style="display:none;"> <!-- hidden tab code start -->
