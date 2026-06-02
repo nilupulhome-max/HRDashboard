@@ -683,20 +683,11 @@ function renderMpEntryRows() {
         <span class="${r.shift==='DAY'?'badge-day':'badge-night'}">${r.shift}</span></td>
       <td style="padding:6px 8px;text-align:center;">${r.section}</td>
       <td style="padding:6px 8px;text-align:center;font-weight:700;">${r.heads}</td>
-      <td style="padding:6px 8px;text-align:center;color:#1a3a5c;font-weight:700;">
-        Rs ${r.rate.toLocaleString()}</td>
-      <td style="padding:6px 8px;text-align:center;color:#c0392b;font-weight:800;">
-        Rs ${r.cost.toLocaleString()}</td>
       <td style="padding:6px 8px;text-align:center;">
         <button onclick="removeMpRow(${i})"
           style="background:#e74c3c;color:#fff;border:none;padding:4px 10px;
-          border-radius:4px;cursor:pointer;font-size:.75rem;">✕</button></td>
-    </tr>`).join('');
-  const total = mpRows.reduce((s, r) => s + r.cost, 0);
-  tfoot.innerHTML = `<tr style="background:#1a3a5c;color:#fff;font-weight:800;">
-    <td colspan="5" style="padding:8px 10px;text-align:left;">TOTAL</td>
-    <td style="padding:8px;text-align:center;">Rs ${total.toLocaleString()}</td>
-    <td></td></tr>`;
+          border-radius:4px;cursor:pointer;font-size:.75rem;">✕</button>
+    <td></td></tr>`).join('');
 }
 
 async function loadMpEntry() {

@@ -12,9 +12,7 @@
 </head>
 <body>
 
-<!-- ══════════════════════════════════════════════════
-     LOGIN SCREEN
-══════════════════════════════════════════════════ -->
+<!-- LOGIN -->
 <div id="loginScreen">
   <div class="login-box">
     <div class="login-logo">🏭</div>
@@ -27,9 +25,7 @@
   </div>
 </div>
 
-<!-- ══════════════════════════════════════════════════
-     APP (shown after login)
-══════════════════════════════════════════════════ -->
+<!-- APP -->
 <div id="appContent" style="display:none;">
 
 <header>
@@ -42,24 +38,26 @@
   <div class="tabs">
     <button class="tab active" onclick="switchTab('entry',this)">📝 Data Entry</button>
     <button class="tab"        onclick="switchTab('dashboard',this)">📊 Dashboard</button>
-    <button class="tab"        onclick="switchTab('manpower',this)">👷 Manpower</button>
   </div>
 </header>
 
 <!-- ══════════════════════════════════════════════════
      TAB: DATA ENTRY
+     1. Canteen Shift Entry
+     2. Daily Manpower Entry
+     3. OT Entry
 ══════════════════════════════════════════════════ -->
 <div id="tab-entry" class="tab-content active">
 <div class="container">
-  <div class="card">
-    <div class="card-title">Shift Entry Form</div>
-    <div class="form-grid">
 
+  <!-- 1. Canteen Entry -->
+  <div class="card">
+    <div class="card-title">📋 Canteen Shift Entry</div>
+    <div class="form-grid">
       <div class="field">
         <label>Date</label>
         <input type="date" id="e-date"/>
       </div>
-
       <div class="field">
         <label>Shift</label>
         <select id="e-shift">
@@ -67,7 +65,6 @@
           <option value="NIGHT">NIGHT (20:00–08:00)</option>
         </select>
       </div>
-
       <div class="field">
         <label>Supplier</label>
         <select id="e-supplier">
@@ -79,14 +76,12 @@
           <option>Walgama Hotel</option>
         </select>
       </div>
-
       <div class="field">
         <label>Item</label>
         <select id="e-itemType">
           <option value="">— select item —</option>
         </select>
       </div>
-
       <div class="field" id="field-biscuitCode" style="display:none;">
         <label>Biscuit Type</label>
         <select id="e-biscuitCode">
@@ -99,18 +94,82 @@
           <option>Other</option>
         </select>
       </div>
-
       <div class="field" id="field-qty" style="display:none;">
         <label>Quantity</label>
         <input type="number" id="e-qty" min="0" value="0"/>
       </div>
-
     </div>
     <div class="form-actions">
       <button class="btn-save" onclick="saveRecord()">💾 Save</button>
       <button class="btn-clear" onclick="clearForm()">✕ Clear</button>
     </div>
   </div>
+
+  <!-- 2. Daily Manpower Entry -->
+  <div class="card">
+    <div class="card-title">👷 Daily Manpower Entry</div>
+    <div class="form-grid-small" style="margin-bottom:14px;">
+      <div class="field">
+        <label>Date</label>
+        <input type="date" id="mp-date"/>
+      </div>
+      <div class="field">
+        <label>Company</label>
+        <select id="mp-e-company"><option value="">— select —</option></select>
+      </div>
+      <div class="field">
+        <label>Shift</label>
+        <select id="mp-e-shift">
+          <option value="DAY">DAY</option>
+          <option value="NIGHT">NIGHT</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Section</label>
+        <select id="mp-e-section"><option value="">— select —</option></select>
+      </div>
+      <div class="field">
+        <label>Heads (count)</label>
+        <input type="number" id="mp-e-heads" min="1" value="1"/>
+      </div>
+      <div class="field">
+        <label>Rate (auto)</label>
+        <input type="text" id="mp-e-rate" readonly placeholder="auto-filled"/>
+      </div>
+      <div class="field">
+        <label>Cost Preview</label>
+        <input type="text" id="mp-e-cost" readonly placeholder="auto-filled"/>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn-add" onclick="addMpEntryRow()">➕ Add Row</button>
+    </div>
+
+    <div class="table-scroll" style="margin-top:14px;">
+      <table>
+        <thead>
+          <tr class="th-sub">
+            <th class="left" style="padding:8px 10px;min-width:120px;">Company</th>
+            <th style="padding:8px 10px;">Shift</th>
+            <th style="padding:8px 10px;">Section</th>
+            <th style="padding:8px 10px;">Heads</th>
+            <th style="padding:8px 10px;">✕</th>
+          </tr>
+        </thead>
+        <tbody id="mp-entry-body">
+          <tr><td colspan="7" class="loading-cell">No rows yet — add above.</td></tr>
+        </tbody>
+        <tfoot id="mp-entry-foot"></tfoot>
+      </table>
+    </div>
+    <div class="form-actions" style="margin-top:14px;">
+      <button class="btn-save" onclick="saveMpEntry()">💾 Save Manpower</button>
+      <span class="save-status" id="mp-entry-status"></span>
+    </div>
+  </div>
+
+  
+
 </div>
 </div><!-- /tab-entry -->
 
@@ -124,15 +183,16 @@
   <div class="card">
     <div class="card-title">⚙ Cost Configuration (Rs) — HR Only</div>
     <div class="cost-grid">
-      <div class="cost-field"><label>Milk Tea / cup</label>  <input type="number" id="c-milkTea"   value="47.50"/></div>
-      <div class="cost-field"><label>Plain Tea / cup</label> <input type="number" id="c-plainTea"  value="20"/></div>
-      <div class="cost-field"><label>Koththamalli / cup</label><input type="number" id="c-kotha"   value="25"/></div>
-      <div class="cost-field"><label>Snack / unit</label>    <input type="number" id="c-snack"     value="80"/></div>
-      <div class="cost-field"><label>Biscuit / pack</label>  <input type="number" id="c-biscuit"   value="375"/></div>
-      <div class="cost-field"><label>Breakfast / meal</label><input type="number" id="c-breakfast" value="170"/></div>
-      <div class="cost-field"><label>Lunch / meal</label>    <input type="number" id="c-lunch"     value="170"/></div>
-      <div class="cost-field"><label>Dinner / meal</label>   <input type="number" id="c-dinner"    value="170"/></div>
-      <div class="cost-field"><label>OT Rate / hr</label>    <input type="number" id="c-otRate"    value="300"/></div>
+      <div class="cost-field"><label>Milk Tea / cup</label>   <input type="number" id="c-milkTea"   value="47.50"/></div>
+      <div class="cost-field"><label>Plain Tea / cup</label>  <input type="number" id="c-plainTea"  value="20"/></div>
+      <div class="cost-field"><label>Koththamalli / cup</label><input type="number" id="c-kotha"    value="25"/></div>
+      <div class="cost-field"><label>Snack / unit</label>     <input type="number" id="c-snack"     value="80"/></div>
+      <div class="cost-field"><label>Biscuit / pack</label>   <input type="number" id="c-biscuit"   value="375"/></div>
+      <div class="cost-field"><label>Breakfast / meal</label> <input type="number" id="c-breakfast" value="170"/></div>
+      <div class="cost-field"><label>Lunch / meal</label>     <input type="number" id="c-lunch"     value="170"/></div>
+      <div class="cost-field"><label>Dinner / meal</label>    <input type="number" id="c-dinner"    value="170"/></div>
+      <div class="cost-field"><label>Master OT Rate (Rs/month avg)</label>
+        <input type="number" id="c-otRate" value="38000"/></div>
     </div>
     <div class="form-actions">
       <button class="btn-save" onclick="saveCosts()">💾 Save Costs</button>
@@ -140,72 +200,9 @@
     </div>
   </div>
 
-  <!-- Filter -->
-  <div class="filter-bar">
-    <div class="field-inline"><label>From</label><input type="date" id="f-from"/></div>
-    <div class="field-inline"><label>To</label>  <input type="date" id="f-to"/></div>
-    <div class="field-inline">
-      <label>Shift</label>
-      <select id="f-shift">
-        <option value="ALL">All Shifts</option>
-        <option value="DAY">DAY</option>
-        <option value="NIGHT">NIGHT</option>
-      </select>
-    </div>
-    <button class="btn-apply"  onclick="loadDashboard()">🔄 Refresh</button>
-    <button class="btn-export" onclick="exportCSV()">⬇ Export CSV</button>
-  </div>
-
-  <!-- Dashboard Table -->
-  <div class="table-scroll">
-    <table id="dashTable">
-      <thead>
-        <tr class="th-group">
-          <th rowspan="3" class="col-date">Date</th>
-          <th rowspan="3" class="col-shift">Shift</th>
-          <th colspan="5" class="grp-mc">Canteen (MC Caters)</th>
-          <th colspan="3" class="grp-biscuit">Biscuits</th>
-          <th colspan="2" class="grp-sam">Snack (SAM Bake House)</th>
-          <th colspan="2" class="grp-sujeewa">Sujeewa</th>
-          <th colspan="3" class="grp-nilu">Nilu</th>
-          <th colspan="3" class="grp-walgama">Walgama Hotel</th>
-          <th rowspan="3" class="grp-mp">Manpower<br>Cost</th>
-          <th rowspan="3" class="grp-total col-total">Daily Total<br>(Rs)</th>
-        </tr>
-        <tr class="th-sub">
-          <th colspan="2">Tea (Milk)</th>
-          <th colspan="2">Plain Tea</th>
-          <th rowspan="2" class="subtotal-col">Sub Total</th>
-          <th rowspan="2">Code</th><th rowspan="2">Qty</th><th rowspan="2">Total</th>
-          <th rowspan="2">Snack Qty</th><th rowspan="2">Total</th>
-          <th rowspan="2">Breakfast</th><th rowspan="2">Total</th>
-          <th rowspan="2">Lunch</th><th rowspan="2">Dinner</th><th rowspan="2">Total</th>
-          <th rowspan="2">Lunch</th><th rowspan="2">Dinner</th><th rowspan="2">Total</th>
-        </tr>
-        <tr class="th-rate">
-          <th>Qty</th><th class="rate-cell" id="rh-milkTea">–</th>
-          <th>Qty</th><th class="rate-cell" id="rh-plainTea">–</th>
-        </tr>
-      </thead>
-      <tbody id="dashBody">
-        <tr><td colspan="22" class="loading-cell">Switch to this tab to load data.</td></tr>
-      </tbody>
-      <tfoot id="dashFoot"></tfoot>
-    </table>
-  </div>
-
-</div>
-</div><!-- /tab-dashboard -->
-
-<!-- ══════════════════════════════════════════════════
-     TAB: MANPOWER
-══════════════════════════════════════════════════ -->
-<div id="tab-manpower" class="tab-content">
-<div class="container-wide">
-
-  <!-- Master Rates -->
+  <!-- Manpower Master Rates -->
   <div class="card">
-    <div class="card-title">📋 Master Rates — Company / Section / Rate</div>
+    <div class="card-title">📋 Manpower Master Rates</div>
     <div class="form-grid-small" style="margin-bottom:14px;">
       <div class="field"><label>Company</label>
         <input type="text" id="mp-r-company" placeholder="e.g. ABC Labour"/></div>
@@ -223,7 +220,7 @@
       <button class="btn-save" onclick="saveMpRate()">➕ Add Rate</button>
       <span class="save-status" id="mp-rate-status"></span>
     </div>
-    <div class="table-scroll" style="margin-top:16px;">
+    <div class="table-scroll" style="margin-top:14px;">
       <table>
         <thead>
           <tr class="th-sub">
@@ -241,65 +238,13 @@
     </div>
   </div>
 
-  <!-- Daily Entry -->
-  <div class="card">
-    <div class="card-title">📅 Daily Manpower Entry</div>
-    <div class="form-grid-small" style="margin-bottom:14px;">
-      <div class="field"><label>Date</label>
-        <input type="date" id="mp-date"/></div>
-      <div class="field"><label>Company</label>
-        <select id="mp-e-company"><option value="">— select —</option></select></div>
-      <div class="field"><label>Shift</label>
-        <select id="mp-e-shift">
-          <option value="DAY">DAY</option>
-          <option value="NIGHT">NIGHT</option>
-        </select></div>
-      <div class="field"><label>Section</label>
-        <select id="mp-e-section"><option value="">— select —</option></select></div>
-      <div class="field"><label>Heads (count)</label>
-        <input type="number" id="mp-e-heads" min="1" value="1"/></div>
-      <div class="field"><label>Rate</label>
-        <input type="text" id="mp-e-rate" readonly placeholder="auto"/></div>
-      <div class="field"><label>Cost (preview)</label>
-        <input type="text" id="mp-e-cost" readonly placeholder="auto"/></div>
-    </div>
-    <div class="form-actions">
-      <button class="btn-save" onclick="addMpEntryRow()">➕ Add Row</button>
-    </div>
-
-    <div class="table-scroll" style="margin-top:16px;">
-      <table>
-        <thead>
-          <tr class="th-sub">
-            <th class="left" style="padding:8px 10px;">Company</th>
-            <th style="padding:8px 10px;">Shift</th>
-            <th style="padding:8px 10px;">Section</th>
-            <th style="padding:8px 10px;">Heads</th>
-            <th style="padding:8px 10px;">Rate</th>
-            <th style="padding:8px 10px;">Cost</th>
-            <th style="padding:8px 10px;">✕</th>
-          </tr>
-        </thead>
-        <tbody id="mp-entry-body">
-          <tr><td colspan="7" class="loading-cell">No rows yet.</td></tr>
-        </tbody>
-        <tfoot id="mp-entry-foot"></tfoot>
-      </table>
-    </div>
-
-    <div class="form-actions" style="margin-top:14px;">
-      <button class="btn-save" onclick="saveMpEntry()">💾 Save to Firebase</button>
-      <span class="save-status" id="mp-entry-status"></span>
-    </div>
-  </div>
-
-  <!-- Summary -->
+  <!-- Manpower Summary -->
   <div class="card">
     <div class="card-title">📊 Manpower Summary</div>
-    <div class="filter-bar" style="margin-bottom:14px;">
+    <div class="filter-bar" style="margin-bottom:14px;box-shadow:none;padding:0;">
       <div class="field-inline"><label>From</label><input type="date" id="mp-from"/></div>
       <div class="field-inline"><label>To</label>  <input type="date" id="mp-to"/></div>
-      <button class="btn-apply" onclick="loadMpSummary()">🔄 Load Summary</button>
+      <button class="btn-apply" onclick="loadMpSummary()">🔄 Load</button>
     </div>
     <div class="table-scroll">
       <table>
@@ -315,15 +260,112 @@
           </tr>
         </thead>
         <tbody id="mp-summary-body">
-          <tr><td colspan="7" class="loading-cell">Click Load Summary to view.</td></tr>
+          <tr><td colspan="7" class="loading-cell">Click Load to view.</td></tr>
         </tbody>
         <tfoot id="mp-summary-foot"></tfoot>
       </table>
     </div>
   </div>
 
+<!-- 3. OT Entry -->
+  <div class="card">
+    <div class="card-title">⏱ Daily OT Entry
+      <span class="ot-formula-note">Formula: Hours × (Master OT Rate ÷ 200) × 1.5</span>
+    </div>
+    <div class="ot-rate-banner">
+      Master OT Rate: <strong id="ot-rate-display">Rs –</strong>
+      &nbsp;·&nbsp; Change in Dashboard → Cost Configuration
+    </div>
+    <div class="form-grid-small">
+      <div class="field">
+        <label>Date</label>
+        <input type="date" id="ot-date"/>
+      </div>
+      <!-- DAY -->
+      <div class="field">
+        <label>DAY Shift — OT Hours</label>
+        <input type="number" id="ot-day-hours" min="0" step="0.5" value="0"
+               oninput="calcOTPreview()"/>
+      </div>
+      <div class="field">
+        <label>DAY OT Cost (preview)</label>
+        <input type="text" id="ot-day-cost" readonly placeholder="auto"/>
+      </div>
+      <!-- NIGHT -->
+      <div class="field">
+        <label>NIGHT Shift — OT Hours</label>
+        <input type="number" id="ot-night-hours" min="0" step="0.5" value="0"
+               oninput="calcOTPreview()"/>
+      </div>
+      <div class="field">
+        <label>NIGHT OT Cost (preview)</label>
+        <input type="text" id="ot-night-cost" readonly placeholder="auto"/>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn-save" onclick="saveOT()">💾 Save OT</button>
+      <span class="save-status" id="ot-status"></span>
+    </div>
+  </div>
+
+  <!-- Filter -->
+  <div class="filter-bar">
+    <div class="field-inline"><label>From</label><input type="date" id="f-from"/></div>
+    <div class="field-inline"><label>To</label>  <input type="date" id="f-to"/></div>
+    <div class="field-inline">
+      <label>Shift</label>
+      <select id="f-shift">
+        <option value="ALL">All Shifts</option>
+        <option value="DAY">DAY</option>
+        <option value="NIGHT">NIGHT</option>
+      </select>
+    </div>
+    <button class="btn-apply"  onclick="loadDashboard()">🔄 Refresh Dashboard</button>
+    <button class="btn-export" onclick="exportCSV()">⬇ Export CSV</button>
+  </div>
+
+  <!-- Main Dashboard Table -->
+  <div class="table-scroll">
+    <table id="dashTable">
+      <thead>
+        <tr class="th-group">
+          <th rowspan="3" class="col-date">Date</th>
+          <th rowspan="3" class="col-shift">Shift</th>
+          <th colspan="5" class="grp-mc">Canteen (MC Caters)</th>
+          <th colspan="3" class="grp-biscuit">Biscuits</th>
+          <th colspan="2" class="grp-sam">Snack (SAM Bake House)</th>
+          <th colspan="2" class="grp-sujeewa">Sujeewa</th>
+          <th colspan="3" class="grp-nilu">Nilu</th>
+          <th colspan="3" class="grp-walgama">Walgama Hotel</th>
+          <th rowspan="3" class="grp-mp">Manpower<br>Cost</th>
+          <th colspan="2" class="grp-ot">OT</th>
+          <th rowspan="3" class="grp-total col-total">Daily Total<br>(Rs)</th>
+        </tr>
+        <tr class="th-sub">
+          <th colspan="2">Tea (Milk)</th>
+          <th colspan="2">Plain Tea</th>
+          <th rowspan="2" class="subtotal-col">Sub Total</th>
+          <th rowspan="2">Code</th><th rowspan="2">Qty</th><th rowspan="2">Total</th>
+          <th rowspan="2">Snack Qty</th><th rowspan="2">Total</th>
+          <th rowspan="2">Breakfast</th><th rowspan="2">Total</th>
+          <th rowspan="2">Lunch</th><th rowspan="2">Dinner</th><th rowspan="2">Total</th>
+          <th rowspan="2">Lunch</th><th rowspan="2">Dinner</th><th rowspan="2">Total</th>
+          <th rowspan="2">Hours</th><th rowspan="2">Cost</th>
+        </tr>
+        <tr class="th-rate">
+          <th>Qty</th><th class="rate-cell" id="rh-milkTea">–</th>
+          <th>Qty</th><th class="rate-cell" id="rh-plainTea">–</th>
+        </tr>
+      </thead>
+      <tbody id="dashBody">
+        <tr><td colspan="24" class="loading-cell">Switch to this tab to load data.</td></tr>
+      </tbody>
+      <tfoot id="dashFoot"></tfoot>
+    </table>
+  </div>
+
 </div>
-</div><!-- /tab-manpower -->
+</div><!-- /tab-dashboard -->
 
 </div><!-- /appContent -->
 
