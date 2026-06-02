@@ -164,3 +164,103 @@ td.money{color:#1a3a5c;font-weight:700;}
 td.ot-hrs{color:#4a235a;font-weight:700;}
 td.ot-cost{color:#4a235a;font-weight:700;}
 td.day-total{background:#fde8e8;color:#c0392b;font-weight:800;}
+/* =========================
+   MOBILE RESPONSIVE FIX
+========================= */
+
+@media (max-width: 768px) {
+
+  /* Reduce padding everywhere */
+  body {
+    font-size: 14px;
+  }
+
+  .container, .container-wide {
+    padding: 10px;
+  }
+
+  /* Header becomes stacked */
+  .header-inner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .tabs {
+    flex-wrap: wrap;
+  }
+
+  .tab {
+    flex: 1;
+    text-align: center;
+    padding: 10px;
+    font-size: 13px;
+  }
+
+  /* Cards spacing */
+  .card {
+    padding: 12px;
+    margin-bottom: 12px;
+  }
+
+  .card-title {
+    font-size: 15px;
+  }
+
+  /* Forms become single column */
+  .form-grid,
+  .form-grid-small,
+  .cost-grid {
+    grid-template-columns: 1fr !important;
+    gap: 10px;
+  }
+
+  /* Inputs full width */
+  input, select {
+    width: 100%;
+    font-size: 14px;
+  }
+
+  /* Buttons full width for easier tap */
+  .form-actions {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  button {
+    width: 100%;
+  }
+
+  /* =========================
+     TABLE FIX (MOST IMPORTANT)
+  ========================= */
+
+  .table-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  table {
+    min-width: 900px; /* force scroll instead of squeezing */
+  }
+
+  th, td {
+    font-size: 12px;
+    padding: 6px;
+    white-space: nowrap;
+  }
+
+  /* Hide less important columns on mobile */
+  .hide-mobile {
+    display: none !important;
+  }
+
+  /* Dashboard table sticky first column */
+  #dashTable td:first-child,
+  #dashTable th:first-child {
+    position: sticky;
+    left: 0;
+    background: #fff;
+    z-index: 2;
+  }
+}

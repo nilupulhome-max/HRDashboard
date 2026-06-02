@@ -132,19 +132,10 @@
         <label>Heads (count)</label>
         <input type="number" id="mp-e-heads" min="1" value="1"/>
       </div>
-      <div class="field">
-        <label>Rate (auto)</label>
-        <input type="text" id="mp-e-rate" readonly placeholder="auto-filled"/>
-      </div>
-      <div class="field">
-        <label>Cost Preview</label>
-        <input type="text" id="mp-e-cost" readonly placeholder="auto-filled"/>
-      </div>
     </div>
     <div class="form-actions">
       <button class="btn-add" onclick="addMpEntryRow()">➕ Add Row</button>
     </div>
-
     <div class="table-scroll" style="margin-top:14px;">
       <table>
         <thead>
@@ -154,7 +145,6 @@
             <th style="padding:8px 10px;">Section</th>
             <th style="padding:8px 10px;">Heads</th>
             <th style="padding:8px 10px;">✕</th>
-          </tr>
         </thead>
         <tbody id="mp-entry-body">
           <tr><td colspan="7" class="loading-cell">No rows yet — add above.</td></tr>
