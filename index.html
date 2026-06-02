@@ -5,126 +5,118 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>HR Canteen System</title>
 <link rel="stylesheet" href="styles.css"/>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
-<script src="firebase-config.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+<script src="firebase-config.js"></script>
 </head>
 <body>
 
-  <!-- Login -->
-<div id="loginScreen" class="login-container">
-
-  <div class="login-card">
-    <h2>🍽️ HR Dashboard Login</h2>
-    <p class="subtitle">Sign in to continue</p>
-
-    <input id="email" type="email" placeholder="Email" />
-    <input id="password" type="password" placeholder="Password" />
-
-    <button onclick="login()">Login</button>
-
-    <p id="loginMsg"></p>
+<!-- ══════════════════════════════════════════════════
+     LOGIN SCREEN
+══════════════════════════════════════════════════ -->
+<div id="loginScreen">
+  <div class="login-box">
+    <div class="login-logo">🏭</div>
+    <h2>HR Canteen System</h2>
+    <p class="login-sub">Sign in to continue</p>
+    <input type="email"    id="email"    placeholder="Email address"/>
+    <input type="password" id="password" placeholder="Password" onkeydown="if(event.key==='Enter')login()"/>
+    <button class="btn-login" onclick="login()">Sign In</button>
+    <div id="loginMsg" class="login-msg"></div>
   </div>
-
 </div>
 
-<div id="appContent"> <!-- hidden tab code start -->
-
+<!-- ══════════════════════════════════════════════════
+     APP (shown after login)
+══════════════════════════════════════════════════ -->
+<div id="appContent" style="display:none;">
 
 <header>
   <div class="header-inner">
-    <div class="logo">🏭 HR Dashboard System</div>
-
-    <div class="header-right">
-      <div id="db-badge" class="db-badge connecting">⏳ Connecting…</div>
-      <div class="hclock" id="clock"></div>
-
-      <!-- 👇 Logout button under clock -->
-      <button onclick="logout()" class="logout-btn">🚪 Logout</button>
-    </div>
+    <div class="logo">🏭 HR Canteen System</div>
+    <div id="db-badge" class="db-badge connecting">⏳ Connecting…</div>
+    <div class="hclock" id="clock"></div>
+    <button class="btn-logout" onclick="logout()">Sign Out</button>
   </div>
-
   <div class="tabs">
     <button class="tab active" onclick="switchTab('entry',this)">📝 Data Entry</button>
-    <button class="tab" onclick="switchTab('dashboard',this)">📊 Dashboard</button>
+    <button class="tab"        onclick="switchTab('dashboard',this)">📊 Dashboard</button>
+    <button class="tab"        onclick="switchTab('manpower',this)">👷 Manpower</button>
   </div>
 </header>
 
-<!-- ENTRY TAB -->
+<!-- ══════════════════════════════════════════════════
+     TAB: DATA ENTRY
+══════════════════════════════════════════════════ -->
 <div id="tab-entry" class="tab-content active">
-  <div class="container">
-    <div class="card">
-      <div class="card-title">Shift Entry Form</div>
-      <div class="form-grid">
+<div class="container">
+  <div class="card">
+    <div class="card-title">Shift Entry Form</div>
+    <div class="form-grid">
 
-        <div class="field">
-          <label>Date</label>
-          <input type="date" id="e-date"/>
-        </div>
-
-        <div class="field">
-          <label>Shift</label>
-          <select id="e-shift">
-            <option value="DAY">DAY (08:00–20:00)</option>
-            <option value="NIGHT">NIGHT (20:00–08:00)</option>
-          </select>
-        </div>
-
-        <div class="field">
-          <label>Supplier</label>
-          <select id="e-supplier">
-            <option value="">— select —</option>
-            <option>MC Caters</option>
-            <option>SAM Bake House</option>
-            <option>Sujeewa</option>
-            <option>Nilu</option>
-            <option>Walgama Hotel</option>
-          </select>
-        </div>
-
-        <div class="field">
-          <label>Item Type</label>
-          <select id="e-itemType">
-            <option value="">— select item —</option>
-          </select>
-        </div>
-
-        <!-- Biscuit type: hidden unless biscuit selected -->
-        <div class="field" id="field-biscuitCode">
-          <label>Biscuit Type</label>
-          <select id="e-biscuitCode">
-            <option value="">— select —</option>
-            <option>Chocolate Biscuit</option>
-            <option>Milk Shorts</option>
-            <option>Nice</option>
-            <option>Cream Cracker</option>
-            <option>Marie</option>
-            <option>Other</option>
-          </select>
-        </div>
-
-        <!-- Qty: hidden until item selected -->
-        <div class="field" id="field-qty">
-          <label>Qty</label>
-          <input type="number" id="e-qty" min="0" value="0"/>
-        </div>
-
+      <div class="field">
+        <label>Date</label>
+        <input type="date" id="e-date"/>
       </div>
-      <div class="form-actions">
-        <button class="btn-save" onclick="saveRecord()">💾 Save Record</button>
-        <button class="btn-clear" onclick="clearForm()">✕ Clear</button>
-        <span class="save-status" id="saveStatus"></span>
+
+      <div class="field">
+        <label>Shift</label>
+        <select id="e-shift">
+          <option value="DAY">DAY (08:00–20:00)</option>
+          <option value="NIGHT">NIGHT (20:00–08:00)</option>
+        </select>
       </div>
+
+      <div class="field">
+        <label>Supplier</label>
+        <select id="e-supplier">
+          <option value="">— select supplier —</option>
+          <option>MC Caters</option>
+          <option>SAM Bake House</option>
+          <option>Sujeewa</option>
+          <option>Nilu</option>
+          <option>Walgama Hotel</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label>Item</label>
+        <select id="e-itemType">
+          <option value="">— select item —</option>
+        </select>
+      </div>
+
+      <div class="field" id="field-biscuitCode" style="display:none;">
+        <label>Biscuit Type</label>
+        <select id="e-biscuitCode">
+          <option value="">— select —</option>
+          <option>Chocolate Biscuit</option>
+          <option>Milk Shorts</option>
+          <option>Nice</option>
+          <option>Cream Cracker</option>
+          <option>Marie</option>
+          <option>Other</option>
+        </select>
+      </div>
+
+      <div class="field" id="field-qty" style="display:none;">
+        <label>Quantity</label>
+        <input type="number" id="e-qty" min="0" value="0"/>
+      </div>
+
+    </div>
+    <div class="form-actions">
+      <button class="btn-save" onclick="saveRecord()">💾 Save</button>
+      <button class="btn-clear" onclick="clearForm()">✕ Clear</button>
     </div>
   </div>
 </div>
+</div><!-- /tab-entry -->
 
-
-</div>  <!-- hidden code finish -->
-
-<!-- DASHBOARD TAB -->
+<!-- ══════════════════════════════════════════════════
+     TAB: DASHBOARD
+══════════════════════════════════════════════════ -->
 <div id="tab-dashboard" class="tab-content">
 <div class="container-wide">
 
@@ -132,99 +124,208 @@
   <div class="card">
     <div class="card-title">⚙ Cost Configuration (Rs) — HR Only</div>
     <div class="cost-grid">
-      <div class="cost-field"><label>Milk Tea / cup</label><input type="number" id="c-milkTea" value="47.50"/></div>
-      <div class="cost-field"><label>Plain Tea / cup</label><input type="number" id="c-plainTea" value="20"/></div>
-      <div class="cost-field"><label>Koththamalli / cup</label><input type="number" id="c-kotha" value="25"/></div>
-      <div class="cost-field"><label>Snack / unit</label><input type="number" id="c-snack" value="80"/></div>
-      <div class="cost-field"><label>Biscuit / unit</label><input type="number" id="c-biscuit" value="375"/></div>
+      <div class="cost-field"><label>Milk Tea / cup</label>  <input type="number" id="c-milkTea"   value="47.50"/></div>
+      <div class="cost-field"><label>Plain Tea / cup</label> <input type="number" id="c-plainTea"  value="20"/></div>
+      <div class="cost-field"><label>Koththamalli / cup</label><input type="number" id="c-kotha"   value="25"/></div>
+      <div class="cost-field"><label>Snack / unit</label>    <input type="number" id="c-snack"     value="80"/></div>
+      <div class="cost-field"><label>Biscuit / pack</label>  <input type="number" id="c-biscuit"   value="375"/></div>
       <div class="cost-field"><label>Breakfast / meal</label><input type="number" id="c-breakfast" value="170"/></div>
-      <div class="cost-field"><label>Lunch / meal</label><input type="number" id="c-lunch" value="170"/></div>
-      <div class="cost-field"><label>Dinner / meal</label><input type="number" id="c-dinner" value="170"/></div>
-      <div class="cost-field"><label>OT Rate / hr</label><input type="number" id="c-otRate" value="300"/></div>
-    </div>
-    <div class="cost-actions">
-      <button class="btn-save" onclick="saveCosts()">💾 Save Costs</button>
-      <span class="save-status" id="costStatus"></span>
-    </div>
-  </div>
-
-  <!-- Manpower/OT -->
-  <div class="card">
-    <div class="card-title">👷 Manpower &amp; OT Entry</div>
-    <div class="form-grid-small">
-      <div class="field"><label>Date</label><input type="date" id="mp-date"/></div>
-      <div class="field"><label>Shift</label>
-        <select id="mp-shift"><option value="DAY">DAY</option><option value="NIGHT">NIGHT</option></select>
-      </div>
-      <div class="field"><label>Manpower Cost (Rs)</label><input type="number" id="mp-cost" min="0" value="0"/></div>
-      <div class="field"><label>OT Hours</label><input type="number" id="mp-otHours" min="0" step="0.5" value="0"/></div>
+      <div class="cost-field"><label>Lunch / meal</label>    <input type="number" id="c-lunch"     value="170"/></div>
+      <div class="cost-field"><label>Dinner / meal</label>   <input type="number" id="c-dinner"    value="170"/></div>
+      <div class="cost-field"><label>OT Rate / hr</label>    <input type="number" id="c-otRate"    value="300"/></div>
     </div>
     <div class="form-actions">
-      <button class="btn-save" onclick="saveManpower()">💾 Save Manpower/OT</button>
-      <span class="save-status" id="mpStatus"></span>
+      <button class="btn-save" onclick="saveCosts()">💾 Save Costs</button>
+      <span class="save-status" id="costStatus"></span>
     </div>
   </div>
 
   <!-- Filter -->
   <div class="filter-bar">
     <div class="field-inline"><label>From</label><input type="date" id="f-from"/></div>
-    <div class="field-inline"><label>To</label><input type="date" id="f-to"/></div>
-    <div class="field-inline"><label>Shift</label>
-      <select id="f-shift"><option value="ALL">All Shifts</option><option value="DAY">DAY</option><option value="NIGHT">NIGHT</option></select>
+    <div class="field-inline"><label>To</label>  <input type="date" id="f-to"/></div>
+    <div class="field-inline">
+      <label>Shift</label>
+      <select id="f-shift">
+        <option value="ALL">All Shifts</option>
+        <option value="DAY">DAY</option>
+        <option value="NIGHT">NIGHT</option>
+      </select>
     </div>
-    <button class="btn-apply" onclick="loadDashboard()">🔄 Refresh</button>
+    <button class="btn-apply"  onclick="loadDashboard()">🔄 Refresh</button>
     <button class="btn-export" onclick="exportCSV()">⬇ Export CSV</button>
-    <button class="btn-export" onclick="exportImage()">📷 Export Image</button>
   </div>
 
   <!-- Dashboard Table -->
   <div class="table-scroll">
     <table id="dashTable">
-      <tr class="th-group">
-    <th rowspan="3" class="col-date">Date</th>
-    <th rowspan="3" class="col-shift">Shift</th>
-    <th colspan="5" class="grp-mc">Canteen (MC Caters)</th>
-    <th colspan="3" class="grp-biscuit">Biscuits</th>
-    <th colspan="2" class="grp-sam">Snack (SAM Bake House)</th>
-    <th colspan="2" class="grp-sujeewa">Sujeewa</th>
-    <th colspan="3" class="grp-nilu">Nilu</th>
-    <th colspan="3" class="grp-walgama">Walgama Hotel</th>
-    <th colspan="3" class="grp-mp">Manpower &amp; OT</th>
-    <th rowspan="3" class="grp-total col-total">Daily Total (Rs)</th>
-  </tr>
-  <tr class="th-sub">
-    <th colspan="2">Tea (Milk)</th>
-    <th colspan="2">Plain Tea</th>
-    <th rowspan="2" class="subtotal-col">Sub Total</th>
-    <th rowspan="2">Code</th>
-    <th rowspan="2">Qty</th>
-    <th rowspan="2">Total</th>
-    <th rowspan="2">Evening Qty</th>
-    <th rowspan="2">Total</th>
-    <th rowspan="2">Breakfast</th>
-    <th rowspan="2">Total</th>
-    <th rowspan="2">Lunch</th>
-    <th rowspan="2">Dinner</th>
-    <th rowspan="2">Total</th>
-    <th rowspan="2">Lunch</th>
-    <th rowspan="2">Dinner</th>
-    <th rowspan="2">Total</th>
-    <th rowspan="2">Manpower</th>
-    <th rowspan="2">OT Hrs</th>
-    <th rowspan="2">OT Cost</th>
-  </tr>
-  <tr class="th-rate">
-    <th>Qty</th><th class="rate-cell" id="rh-milkTea">–</th>
-    <th>Qty</th><th class="rate-cell" id="rh-plainTea">–</th>
-  </tr>
-</thead>
-      <tbody id="dashBody"><tr><td colspan="30" class="loading-cell">Loading…</td></tr></tbody>
+      <thead>
+        <tr class="th-group">
+          <th rowspan="3" class="col-date">Date</th>
+          <th rowspan="3" class="col-shift">Shift</th>
+          <th colspan="5" class="grp-mc">Canteen (MC Caters)</th>
+          <th colspan="3" class="grp-biscuit">Biscuits</th>
+          <th colspan="2" class="grp-sam">Snack (SAM Bake House)</th>
+          <th colspan="2" class="grp-sujeewa">Sujeewa</th>
+          <th colspan="3" class="grp-nilu">Nilu</th>
+          <th colspan="3" class="grp-walgama">Walgama Hotel</th>
+          <th rowspan="3" class="grp-mp">Manpower<br>Cost</th>
+          <th rowspan="3" class="grp-total col-total">Daily Total<br>(Rs)</th>
+        </tr>
+        <tr class="th-sub">
+          <th colspan="2">Tea (Milk)</th>
+          <th colspan="2">Plain Tea</th>
+          <th rowspan="2" class="subtotal-col">Sub Total</th>
+          <th rowspan="2">Code</th><th rowspan="2">Qty</th><th rowspan="2">Total</th>
+          <th rowspan="2">Snack Qty</th><th rowspan="2">Total</th>
+          <th rowspan="2">Breakfast</th><th rowspan="2">Total</th>
+          <th rowspan="2">Lunch</th><th rowspan="2">Dinner</th><th rowspan="2">Total</th>
+          <th rowspan="2">Lunch</th><th rowspan="2">Dinner</th><th rowspan="2">Total</th>
+        </tr>
+        <tr class="th-rate">
+          <th>Qty</th><th class="rate-cell" id="rh-milkTea">–</th>
+          <th>Qty</th><th class="rate-cell" id="rh-plainTea">–</th>
+        </tr>
+      </thead>
+      <tbody id="dashBody">
+        <tr><td colspan="22" class="loading-cell">Switch to this tab to load data.</td></tr>
+      </tbody>
       <tfoot id="dashFoot"></tfoot>
     </table>
   </div>
 
 </div>
+</div><!-- /tab-dashboard -->
+
+<!-- ══════════════════════════════════════════════════
+     TAB: MANPOWER
+══════════════════════════════════════════════════ -->
+<div id="tab-manpower" class="tab-content">
+<div class="container-wide">
+
+  <!-- Master Rates -->
+  <div class="card">
+    <div class="card-title">📋 Master Rates — Company / Section / Rate</div>
+    <div class="form-grid-small" style="margin-bottom:14px;">
+      <div class="field"><label>Company</label>
+        <input type="text" id="mp-r-company" placeholder="e.g. ABC Labour"/></div>
+      <div class="field"><label>Shift</label>
+        <select id="mp-r-shift">
+          <option value="DAY">DAY</option>
+          <option value="NIGHT">NIGHT</option>
+        </select></div>
+      <div class="field"><label>Section</label>
+        <input type="text" id="mp-r-section" placeholder="e.g. Packing"/></div>
+      <div class="field"><label>Rate (Rs / head)</label>
+        <input type="number" id="mp-r-rate" min="0" value="0"/></div>
+    </div>
+    <div class="form-actions">
+      <button class="btn-save" onclick="saveMpRate()">➕ Add Rate</button>
+      <span class="save-status" id="mp-rate-status"></span>
+    </div>
+    <div class="table-scroll" style="margin-top:16px;">
+      <table>
+        <thead>
+          <tr class="th-sub">
+            <th class="left" style="padding:8px 10px;">Company</th>
+            <th style="padding:8px 10px;">Shift</th>
+            <th style="padding:8px 10px;">Section</th>
+            <th style="padding:8px 10px;">Rate (Rs)</th>
+            <th style="padding:8px 10px;">Action</th>
+          </tr>
+        </thead>
+        <tbody id="mp-rates-body">
+          <tr><td colspan="5" class="loading-cell">No rates yet.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Daily Entry -->
+  <div class="card">
+    <div class="card-title">📅 Daily Manpower Entry</div>
+    <div class="form-grid-small" style="margin-bottom:14px;">
+      <div class="field"><label>Date</label>
+        <input type="date" id="mp-date"/></div>
+      <div class="field"><label>Company</label>
+        <select id="mp-e-company"><option value="">— select —</option></select></div>
+      <div class="field"><label>Shift</label>
+        <select id="mp-e-shift">
+          <option value="DAY">DAY</option>
+          <option value="NIGHT">NIGHT</option>
+        </select></div>
+      <div class="field"><label>Section</label>
+        <select id="mp-e-section"><option value="">— select —</option></select></div>
+      <div class="field"><label>Heads (count)</label>
+        <input type="number" id="mp-e-heads" min="1" value="1"/></div>
+      <div class="field"><label>Rate</label>
+        <input type="text" id="mp-e-rate" readonly placeholder="auto"/></div>
+      <div class="field"><label>Cost (preview)</label>
+        <input type="text" id="mp-e-cost" readonly placeholder="auto"/></div>
+    </div>
+    <div class="form-actions">
+      <button class="btn-save" onclick="addMpEntryRow()">➕ Add Row</button>
+    </div>
+
+    <div class="table-scroll" style="margin-top:16px;">
+      <table>
+        <thead>
+          <tr class="th-sub">
+            <th class="left" style="padding:8px 10px;">Company</th>
+            <th style="padding:8px 10px;">Shift</th>
+            <th style="padding:8px 10px;">Section</th>
+            <th style="padding:8px 10px;">Heads</th>
+            <th style="padding:8px 10px;">Rate</th>
+            <th style="padding:8px 10px;">Cost</th>
+            <th style="padding:8px 10px;">✕</th>
+          </tr>
+        </thead>
+        <tbody id="mp-entry-body">
+          <tr><td colspan="7" class="loading-cell">No rows yet.</td></tr>
+        </tbody>
+        <tfoot id="mp-entry-foot"></tfoot>
+      </table>
+    </div>
+
+    <div class="form-actions" style="margin-top:14px;">
+      <button class="btn-save" onclick="saveMpEntry()">💾 Save to Firebase</button>
+      <span class="save-status" id="mp-entry-status"></span>
+    </div>
+  </div>
+
+  <!-- Summary -->
+  <div class="card">
+    <div class="card-title">📊 Manpower Summary</div>
+    <div class="filter-bar" style="margin-bottom:14px;">
+      <div class="field-inline"><label>From</label><input type="date" id="mp-from"/></div>
+      <div class="field-inline"><label>To</label>  <input type="date" id="mp-to"/></div>
+      <button class="btn-apply" onclick="loadMpSummary()">🔄 Load Summary</button>
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr class="th-sub">
+            <th class="left" style="padding:8px 10px;">Date</th>
+            <th class="left" style="padding:8px 10px;">Company</th>
+            <th style="padding:8px 10px;">Shift</th>
+            <th style="padding:8px 10px;">Section</th>
+            <th style="padding:8px 10px;">Heads</th>
+            <th style="padding:8px 10px;">Rate</th>
+            <th style="padding:8px 10px;">Cost</th>
+          </tr>
+        </thead>
+        <tbody id="mp-summary-body">
+          <tr><td colspan="7" class="loading-cell">Click Load Summary to view.</td></tr>
+        </tbody>
+        <tfoot id="mp-summary-foot"></tfoot>
+      </table>
+    </div>
+  </div>
+
 </div>
+</div><!-- /tab-manpower -->
+
+</div><!-- /appContent -->
 
 <div id="toast"></div>
 <script src="app.js"></script>
