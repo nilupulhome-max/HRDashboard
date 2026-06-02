@@ -132,7 +132,7 @@ function updateRateHeaders() {
 
 // ── OT cost formula: hours × (MasterRate / 200) × 1.5 ────────
 function otCost(hours) {
-  return Math.round(hours * (COSTS.otRate / 200) * 1.5);
+  return Math.round(hours * COSTS.otRate);
 }
 
 // ════════════════════════════════════════════════════════════
