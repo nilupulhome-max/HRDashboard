@@ -600,13 +600,44 @@ async function deleteMpRate(id) {
 }
 
 function populateMpCompanyDropdown() {
+  const selCompany = document.getElementById('mp-e-company');
+  const selSection = document.getElementById('mp-e-section');
+  const rateInput = document.getElementById('mp-e-rate');
+  const costInput = document.getElementById('mp-e-cost');
+
+  if (!selCompany || !selSection) return;
+
   const companies = [...new Set(mpRates.map(r => r.company))].sort();
-  const sel = document.getElementById('mp-e-company');
-  sel.innerHTML = '<option value="">— select —</option>' +
+
+  selCompany.innerHTML =
+    '<option value="">— select —</option>' +
     companies.map(c => `<option value="${c}">${c}</option>`).join('');
-  document.getElementById('mp-e-section').innerHTML = '<option value="">— select —</option>';
-  document.getElementById('mp-e-rate').value = '';
-  document.getElementById('mp-e-cost').value = '';
+
+  // ❌ DO NOT reset section every time unless company changes
+  selCompany.onchange = function () {
+
+    const company = selCompany.value;
+
+    // reset dependent fields only when company changes
+    if (rateInput) rateInput.value = '';
+    if (costInput) costInput.value = '';
+
+    // OPTIONAL: only clear section if company changes
+    if (selSection) {
+      selSection.innerHTML = '<option value="">— select —</option>';
+    }
+
+    // filter sections dynamically (if mpRates has section data)
+    const sections = [...new Set(
+      mpRates
+        .filter(r => r.company === company)
+        .map(r => r.section)
+    )].sort();
+
+    selSection.innerHTML += sections
+      .map(s => `<option value="${s}">${s}</option>`)
+      .join('');
+  };
 }
 
 function onMpCompanyOrShiftChange() {
