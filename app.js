@@ -412,8 +412,11 @@ function renderTable() {
     const walgD     = walg.dinnerQty || 0;
     const walgTotal = Math.round((walgL * COSTS.lunch) + (walgD * COSTS.dinner));
 
-    // Manpower (one entry per day, shown on DAY row only to avoid double-counting)
-    const mpTotal = (shift === 'DAY' && mpEntry) ? (mpEntry.totalCost || 0) : 0;
+    // Manpower entry
+   const mpHeads = mpEntry
+  ? (mpEntry.rows || []).filter(r => r.shift === shift).reduce((s, r) => s + (r.heads || 0), 0) : 0;
+const mpTotal = mpEntry
+  ? (mpEntry.rows || []).filter(r => r.shift === shift).reduce((s, r) => s + (r.cost  || 0), 0) : 0;
 
     // OT — split by shift from the daily ot_entry doc
     let otHours = 0, otCostVal = 0;
@@ -438,7 +441,7 @@ function renderTable() {
     GT.sujBrf       += sujBrf;     GT.sujTotal      += sujTotal;
     GT.niluL        += niluL;      GT.niluD         += niluD;     GT.niluTotal += niluTotal;
     GT.walgL        += walgL;      GT.walgD         += walgD;     GT.walgTotal += walgTotal;
-    GT.mpTotal      += mpTotal;
+    GT.mpHeads      += mpHeads;    GT.mpTotal       += mpTotal; 
     GT.otHours      += otHours;    GT.otCost        += otCostVal;
     GT.dayTotal     += dayTotal;
 
@@ -461,6 +464,7 @@ function renderTable() {
       <td>${n(sujBrf)}</td><td class="money">${rs(sujTotal)}</td>
       <td>${n(niluL)}</td><td>${n(niluD)}</td><td class="money">${rs(niluTotal)}</td>
       <td>${n(walgL)}</td><td>${n(walgD)}</td><td class="money">${rs(walgTotal)}</td>
+      <td class="mp-heads">${mpHeads > 0 ? mpHeads : '<span class="dash">–</span>'}</td>
       <td class="money">${rs(mpTotal)}</td>
       <td class="ot-hrs">${otHours > 0 ? otHours : '<span class="dash">–</span>'}</td>
       <td class="money ot-cost">${rs(otCostVal)}</td>
@@ -480,7 +484,7 @@ function renderTable() {
     <td>${GT.sujBrf}</td><td>${rs(GT.sujTotal)}</td>
     <td>${GT.niluL}</td><td>${GT.niluD}</td><td>${rs(GT.niluTotal)}</td>
     <td>${GT.walgL}</td><td>${GT.walgD}</td><td>${rs(GT.walgTotal)}</td>
-    <td>${rs(GT.mpTotal)}</td>
+    <td>${GT.mpHeads}</td><td>${rs(GT.mpTotal)}</td>   
     <td>${GT.otHours}</td><td>${rs(GT.otCost)}</td>
     <td style="font-size:.92rem;">${rs(GT.dayTotal)}</td>
   </tr>`;
@@ -492,7 +496,7 @@ function zeros() {
     bisQty:0, bisTotal:0, samSnack:0, samSnackTotal:0,
     sujBrf:0, sujTotal:0, niluL:0, niluD:0, niluTotal:0,
     walgL:0, walgD:0, walgTotal:0,
-    mpTotal:0, otHours:0, otCost:0, dayTotal:0
+    mpHeads:0, mpTotal:0, otHours:0, otCost:0, dayTotal:0
   };
 }
 
@@ -534,6 +538,35 @@ function exportCSV() {
   a.download = `canteen_${document.getElementById('f-from').value}_to_${document.getElementById('f-to').value}.csv`;
   a.click(); toast('CSV downloaded!');
 }
+
+// ── Export Image ────────────────────────────────────────────────
+async function exportImage() {
+
+    const scrollDiv = document.getElementById('dashTable').parentElement;
+
+  const originalOverflow = scrollDiv.style.overflow;
+  const originalWidth = scrollDiv.style.width;
+
+  scrollDiv.style.overflow = 'visible';
+  scrollDiv.style.width = scrollDiv.scrollWidth + 'px';
+
+  const canvas = await html2canvas(scrollDiv, {
+      scale: 3,
+      width: scrollDiv.scrollWidth,
+      height: scrollDiv.scrollHeight,
+      windowWidth: scrollDiv.scrollWidth,
+      windowHeight: scrollDiv.scrollHeight
+  });
+
+  scrollDiv.style.overflow = originalOverflow;
+  scrollDiv.style.width = originalWidth;
+
+  const link = document.createElement('a');
+  link.download = 'HR-Canteen-Full-Dashboard.png';
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+}
+
 
 // ════════════════════════════════════════════════════════════
 //  MANPOWER SYSTEM  (rates in Dashboard, entry in Data Entry)
@@ -645,14 +678,16 @@ function onMpCompanyOrShiftChange() {
   const shift   = document.getElementById('mp-e-shift').value;
   const secSel  = document.getElementById('mp-e-section');
   secSel.innerHTML = '<option value="">— select —</option>';
-  document.getElementById('mp-e-rate').value = '';
-  document.getElementById('mp-e-cost').value = '';
   if (!company || !shift) return;
-  mpRates.filter(r => r.company === company && r.shift === shift).forEach(r => {
-    const opt = document.createElement('option');
-    opt.value = r.id; opt.textContent = r.section;
-    secSel.appendChild(opt);
-  });
+
+  mpRates
+    .filter(r => r.company === company && r.shift === shift)
+    .forEach(r => {
+      const opt = document.createElement('option');
+      opt.value = r.id;
+      opt.textContent = r.section;
+      secSel.appendChild(opt);
+    });
 }
 
 function onMpSectionChange() {
@@ -687,10 +722,8 @@ function addMpEntryRow() {
     section: rate.section, rate: rate.rate, heads,
     cost: Math.round(heads * rate.rate)
   });
-  document.getElementById('mp-e-section').innerHTML = '<option value="">— select —</option>';
   document.getElementById('mp-e-heads').value = 1;
-  document.getElementById('mp-e-rate').value  = '';
-  document.getElementById('mp-e-cost').value  = '';
+  // removed mp-e-rate and mp-e-cost — don't exist in HTML
   renderMpEntryRows();
 }
 

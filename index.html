@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>HR Canteen System</title>
 <link rel="stylesheet" href="styles.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
@@ -30,7 +31,7 @@
 
 <header>
   <div class="header-inner">
-    <div class="logo">🏭 HR Dashnoard System</div>
+    <div class="logo">🏭 HR Dashboard System</div>
     <div id="db-badge" class="db-badge connecting">⏳ Connecting…</div>
     <div class="hclock" id="clock"></div>
     <button class="btn-logout" onclick="logout()">Sign Out</button>
@@ -312,6 +313,7 @@
     </div>
     <button class="btn-apply"  onclick="loadDashboard()">🔄 Refresh Dashboard</button>
     <button class="btn-export" onclick="exportCSV()">⬇ Export CSV</button>
+     <button class="btn-export" onclick="exportImage()">📷 Export Image</button>
   </div>
 
   <!-- Main Dashboard Table -->
@@ -327,7 +329,7 @@
           <th colspan="2" class="grp-sujeewa">Sujeewa</th>
           <th colspan="3" class="grp-nilu">Nilu</th>
           <th colspan="3" class="grp-walgama">Walgama Hotel</th>
-          <th rowspan="3" class="grp-mp">Manpower<br>Cost</th>
+          <th colspan="2" class="grp-mp">Manpower</th>
           <th colspan="2" class="grp-ot">OT</th>
           <th rowspan="3" class="grp-total col-total">Daily Total<br>(Rs)</th>
         </tr>
@@ -340,6 +342,7 @@
           <th rowspan="2">Breakfast</th><th rowspan="2">Total</th>
           <th rowspan="2">Lunch</th><th rowspan="2">Dinner</th><th rowspan="2">Total</th>
           <th rowspan="2">Lunch</th><th rowspan="2">Dinner</th><th rowspan="2">Total</th>
+          <th rowspan="2">Heads</th><th rowspan="2">Cost</th>
           <th rowspan="2">Hours</th><th rowspan="2">Cost</th>
         </tr>
         <tr class="th-rate">
