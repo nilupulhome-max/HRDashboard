@@ -164,6 +164,10 @@ td.money{color:#1a3a5c;font-weight:700;}
 td.ot-hrs{color:#4a235a;font-weight:700;}
 td.ot-cost{color:#4a235a;font-weight:700;}
 td.day-total{background:#fde8e8;color:#c0392b;font-weight:800;}
+
+
+
+
 /* =========================
    MOBILE RESPONSIVE FIX
 ========================= */
@@ -255,12 +259,5 @@ td.day-total{background:#fde8e8;color:#c0392b;font-weight:800;}
     display: none !important;
   }
 
-  /* Dashboard table sticky first column */
-  #dashTable td:first-child,
-  #dashTable th:first-child {
-    position: sticky;
-    left: 0;
-    background: #fff;
-    z-index: 2;
-  }
+
 }
