@@ -72,7 +72,7 @@ function switchTab(name, btn) {
   document.getElementById('ot-date').value   = today;
   document.getElementById('mp-date').value   = today;
 
-  document.getElementById('f-to').value = today;
+  /*document.getElementById('f-to').value = today;
   const from = new Date(now); from.setDate(from.getDate() - 13);
   document.getElementById('f-from').value =
     `${from.getFullYear()}-${pad(from.getMonth()+1)}-${pad(from.getDate())}`;
@@ -80,7 +80,16 @@ function switchTab(name, btn) {
   const mpFrom = new Date(now); mpFrom.setDate(mpFrom.getDate() - 13);
   document.getElementById('mp-from').value =
     `${mpFrom.getFullYear()}-${pad(mpFrom.getMonth()+1)}-${pad(mpFrom.getDate())}`;
-  document.getElementById('mp-to').value = today;
+  document.getElementById('mp-to').value = today;*/
+
+  const firstOfMonth = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-01`;
+
+document.getElementById('f-to').value   = today;
+document.getElementById('f-from').value = firstOfMonth;
+
+document.getElementById('mp-from').value = firstOfMonth;
+document.getElementById('mp-to').value   = today;
+
 })();
 
 // ════════════════════════════════════════════════════════════
