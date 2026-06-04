@@ -165,7 +165,9 @@ td.ot-hrs{color:#4a235a;font-weight:700;}
 td.ot-cost{color:#4a235a;font-weight:700;}
 td.day-total{background:#fde8e8;color:#c0392b;font-weight:800;}
 
-
+.btn-delete{background:#fde8e8;border:1px solid #f5c6c6;color:#c0392b;padding:9px 16px;
+  border-radius:6px;font-size:.82rem;font-weight:700;cursor:pointer;align-self:flex-end;}
+.btn-delete:hover{background:#c0392b;color:#fff;}
 
 
 /* =========================

@@ -576,6 +576,42 @@ async function exportImage() {
   link.click();
 }
 
+// ── Clear all records ────────────────────────────────────────────────
+
+
+
+async function clearRangeRecords() {
+  const from  = document.getElementById('f-from').value;
+  const to    = document.getElementById('f-to').value;
+  if (!from || !to) { toast('Select a date range first', true); return; }
+
+  const confirmed = confirm(
+    `⚠️ This will permanently delete ALL records from ${from} to ${to}.\n\nIncludes: Canteen, OT, Manpower entries.\n\nAre you sure?`
+  );
+  if (!confirmed) return;
+
+  toast('Deleting…');
+
+  try {
+    const collections = ['records', 'ot_entries', 'manpower_entries'];
+
+    for (const col of collections) {
+      const snap = await db.collection(col)
+        .where('date', '>=', from)
+        .where('date', '<=', to)
+        .get();
+      const batch = db.batch();
+      snap.forEach(d => batch.delete(d.ref));
+      await batch.commit();
+    }
+
+    toast('✔ All records deleted for selected range!');
+    dashData = [];
+    renderTable();
+
+  } catch (e) { toast('Error: ' + e.message, true); }
+}
+
 
 // ════════════════════════════════════════════════════════════
 //  MANPOWER SYSTEM  (rates in Dashboard, entry in Data Entry)
