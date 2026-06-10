@@ -1,219 +1,767 @@
-*{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:'Segoe UI',Arial,sans-serif;background:#edf1f5;font-size:13px;}
-
-/* ── LOGIN ── */
-#loginScreen{display:flex;align-items:center;justify-content:center;
-  min-height:100vh;background:linear-gradient(135deg,#1a3a5c 0%,#2c5f8a 100%);}
-.login-box{background:#fff;border-radius:16px;padding:40px 36px;width:340px;
-  box-shadow:0 8px 32px rgba(0,0,0,.25);text-align:center;}
-.login-logo{font-size:2.5rem;margin-bottom:10px;}
-.login-box h2{font-size:1.2rem;color:#1a3a5c;font-weight:700;margin-bottom:4px;}
-.login-sub{font-size:.82rem;color:#888;margin-bottom:20px;}
-.login-box input{display:block;width:100%;padding:11px 14px;border:1px solid #d0d8e4;
-  border-radius:8px;font-size:.9rem;margin-bottom:12px;outline:none;background:#f8fafc;}
-.login-box input:focus{border-color:#1a3a5c;}
-.btn-login{width:100%;background:#1a3a5c;color:#fff;border:none;padding:12px;
-  border-radius:8px;font-size:.95rem;font-weight:700;cursor:pointer;letter-spacing:.02em;}
-.btn-login:hover{background:#24537f;}
-.login-msg{margin-top:12px;font-size:.8rem;color:#c0392b;min-height:18px;}
-
-/* ── HEADER ── */
-header{background:#1a3a5c;color:#fff;position:sticky;top:0;z-index:200;
-  box-shadow:0 2px 8px rgba(0,0,0,.25);}
-.header-inner{display:flex;align-items:center;gap:14px;padding:10px 20px;}
-.logo{font-size:1.05rem;font-weight:700;}
-.hclock{margin-left:auto;font-size:.75rem;opacity:.7;}
-.db-badge{font-size:.72rem;padding:3px 10px;border-radius:12px;border:1px solid;}
-.db-badge.connecting{color:#e3b341;border-color:#e3b341;}
-.db-badge.connected{color:#56d364;border-color:#56d364;}
-.db-badge.error{color:#f78166;border-color:#f78166;}
-.btn-logout{background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3);
-  padding:6px 14px;border-radius:6px;cursor:pointer;font-size:.78rem;font-weight:600;}
-.btn-logout:hover{background:rgba(255,255,255,.25);}
-
-/* ── TABS ── */
-.tabs{display:flex;padding:0 20px;}
-.tab{background:transparent;color:rgba(255,255,255,.6);border:none;
-  border-bottom:3px solid transparent;padding:9px 22px;cursor:pointer;
-  font-size:.87rem;font-weight:600;letter-spacing:.02em;transition:.15s;}
-.tab:hover{color:#fff;}
-.tab.active{color:#fff;border-bottom-color:#f0a500;}
-
-/* ── TAB CONTENT ── */
-.tab-content{display:none;}
-.tab-content.active{display:block;}
-
-/* ── LAYOUT ── */
-.container{max-width:900px;margin:0 auto;padding:20px 16px 40px;}
-.container-wide{padding:20px 16px 40px;}
-
-/* ── CARDS ── */
-.card{background:#fff;border-radius:10px;
-  box-shadow:0 2px 10px rgba(0,0,0,.07);padding:20px 24px;margin-bottom:18px;}
-.card-title{font-size:.88rem;font-weight:700;color:#1a3a5c;
-  border-bottom:2px solid #e5eaf0;padding-bottom:10px;margin-bottom:16px;
-  text-transform:uppercase;letter-spacing:.04em;}
-
-/* ── FORM GRIDS ── */
-.form-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;}
-.form-grid-small{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px;}
-.cost-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(145px,1fr));gap:12px;margin-bottom:14px;}
-
-.field,.cost-field{display:flex;flex-direction:column;gap:5px;}
-.field label,.cost-field label{font-size:.7rem;font-weight:700;color:#5a6e84;
-  text-transform:uppercase;letter-spacing:.05em;}
-.field input,.field select,.cost-field input{
-  padding:9px 10px;border:1px solid #d0d8e4;border-radius:6px;
-  font-size:.88rem;background:#f8fafc;outline:none;width:100%;transition:.15s;}
-.field input:focus,.field select:focus,.cost-field input:focus{
-  border-color:#1a3a5c;background:#fff;}
-.field input[readonly]{background:#f0f4f8;color:#666;}
-
-/* ── BUTTONS ── */
-.btn-save{background:#1a3a5c;color:#fff;border:none;padding:10px 22px;
-  border-radius:6px;font-size:.83rem;font-weight:700;cursor:pointer;transition:.15s;}
-.btn-save:hover{background:#24537f;}
-.btn-clear{background:#fff;color:#666;border:1px solid #d0d8e4;padding:10px 16px;
-  border-radius:6px;font-size:.83rem;cursor:pointer;}
-.btn-clear:hover{background:#f5f5f5;}
-.form-actions{display:flex;align-items:center;gap:12px;margin-top:14px;
-  padding-top:14px;border-top:1px solid #eef0f4;}
-.save-status{font-size:.8rem;font-weight:600;color:#1e8449;}
-
-/* ── FILTER BAR ── */
-.filter-bar{background:#fff;border-radius:10px;box-shadow:0 2px 10px rgba(0,0,0,.07);
-  padding:14px 18px;display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:16px;}
-.field-inline{display:flex;flex-direction:column;gap:4px;}
-.field-inline label{font-size:.7rem;font-weight:700;color:#5a6e84;text-transform:uppercase;letter-spacing:.05em;}
-.field-inline input,.field-inline select{padding:8px 10px;border:1px solid #d0d8e4;
-  border-radius:6px;font-size:.85rem;background:#f8fafc;outline:none;}
-.btn-apply{background:#1a3a5c;color:#fff;border:none;padding:9px 16px;
-  border-radius:6px;font-size:.82rem;font-weight:700;cursor:pointer;align-self:flex-end;}
-.btn-apply:hover{background:#24537f;}
-.btn-export{background:#f8fafc;border:1px solid #d0d8e4;color:#444;padding:9px 16px;
-  border-radius:6px;font-size:.82rem;cursor:pointer;align-self:flex-end;}
-.btn-export:hover{background:#e8eef5;}
-
-/* ── TABLE ── */
-.table-scroll{overflow-x:auto;border-radius:10px;box-shadow:0 2px 10px rgba(0,0,0,.07);}
-table{border-collapse:collapse;font-size:12px;width:100%;background:#fff;}
-#dashTable{min-width:1200px;}
-
-/* Group header colours */
-.grp-mc      {background:#1a3a5c;color:#fff;}
-.grp-biscuit {background:#5b2d8e;color:#fff;}
-.grp-sam     {background:#8b3300;color:#fff;}
-.grp-sujeewa {background:#155a35;color:#fff;}
-.grp-nilu    {background:#154360;color:#fff;}
-.grp-walgama {background:#6d5504;color:#fff;}
-.grp-mp      {background:#333;color:#fff;vertical-align:middle;}
-.grp-total   {background:#c0392b;color:#fff;vertical-align:middle;}
-
-th{padding:7px 8px;text-align:center;border:1px solid #b0bec5;white-space:nowrap;}
-td{padding:6px 8px;text-align:center;border:1px solid #dde3eb;white-space:nowrap;}
-td.left{text-align:left;}
-
-.th-sub th{background:#eef3f9;color:#2c3e50;font-size:.69rem;font-weight:700;
-  text-transform:uppercase;letter-spacing:.04em;}
-.th-rate th{background:#dce8f5;color:#1a3a5c;font-size:.7rem;}
-.rate-cell{font-weight:800!important;}
-
-tbody tr:nth-child(even){background:#f9fbfd;}
-tbody tr:hover{background:#e8f0f8;}
-
-.col-date{min-width:115px;text-align:left!important;padding-left:10px!important;}
-.col-shift{min-width:68px;}
-.col-total{min-width:105px;}
-.subtotal-col{background:#d9e5f2!important;font-weight:700;}
-
-/* Shift badges */
-.badge-day  {background:#d6eaf8;color:#1a5276;border-radius:4px;
-  padding:2px 7px;font-weight:700;font-size:.7rem;display:inline-block;}
-.badge-night{background:#fef9e7;color:#7d6608;border-radius:4px;
-  padding:2px 7px;font-weight:700;font-size:.7rem;display:inline-block;}
-
-/* Footer */
-tfoot tr td{font-weight:700;font-size:.8rem;}
-tfoot tr.grand-row td{background:#1a3a5c!important;color:#fff!important;font-weight:800;}
-
-.loading-cell{text-align:center!important;padding:28px!important;color:#aaa;font-style:italic;}
-td.money{color:#1a3a5c;font-weight:700;}
-.dash{color:#ccc;}
-
-/* ── TOAST ── */
-#toast{position:fixed;bottom:22px;right:18px;padding:10px 18px;border-radius:8px;
-  font-weight:700;font-size:.83rem;color:#fff;transform:translateY(60px);
-  opacity:0;transition:.3s;z-index:9999;}
-#toast.show{transform:translateY(0);opacity:1;}
-#toast.ok {background:#1e8449;}
-#toast.err{background:#c0392b;}
-
-/* ── OT Entry extras ── */
-.ot-formula-note{font-size:.72rem;color:#888;font-weight:400;margin-left:10px;text-transform:none;letter-spacing:0;}
-.ot-rate-banner{background:#fff8e1;border:1px solid #f0a500;border-radius:6px;
-  padding:8px 14px;font-size:.82rem;color:#555;margin-bottom:14px;}
-.ot-rate-banner strong{color:#1a3a5c;font-size:.95rem;}
-
-/* ── Add row button ── */
-.btn-add{background:#1e8449;color:#fff;border:none;padding:10px 20px;
-  border-radius:6px;font-size:.83rem;font-weight:700;cursor:pointer;transition:.15s;}
-.btn-add:hover{background:#27ae60;}
-
-/* ── OT columns in table ── */
-.grp-ot{background:#4a235a;color:#fff;}
-td.ot-hrs{color:#4a235a;font-weight:700;}
-td.ot-cost{color:#4a235a;font-weight:700;}
-td.day-total{background:#fde8e8;color:#c0392b;font-weight:800;}
-
-.btn-delete{background:#fde8e8;border:1px solid #f5c6c6;color:#c0392b;padding:9px 16px;
-  border-radius:6px;font-size:.82rem;font-weight:700;cursor:pointer;align-self:flex-end;}
-.btn-delete:hover{background:#c0392b;color:#fff;}
+/* ============================================================
+   HR Canteen System — styles.css
+   
+   TABLE OF CONTENTS
+   ──────────────────
+    1.  Reset & Base
+    2.  Login Screen
+    3.  Header
+    4.  Tab Navigation
+    5.  Tab Content Panels
+    6.  Layout Containers
+    7.  Cards
+    8.  Form Grids & Fields
+    9.  Buttons
+   10.  Filter Bar
+   11.  Tables — Base Styles
+   12.  Tables — Group Header Colours
+   13.  Tables — Row Styles & Shift Badges
+   14.  Tables — Footer
+   15.  OT Entry Extras
+   16.  Toast Notification
+   17.  Utility Classes
+   18.  Mobile Responsive (≤768 px)
+   ============================================================ */
 
 
-/* =========================
-   MOBILE RESPONSIVE FIX
-========================= */
+/* ════════════════════════════════════════════════════════════
+   1. RESET & BASE
+   Simple box-model reset and body defaults.
+════════════════════════════════════════════════════════════ */
+* {
+  box-sizing: border-box;
+  margin:  0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Segoe UI', Arial, sans-serif;
+  background:  #edf1f5;
+  font-size:   13px;
+}
+
+
+/* ════════════════════════════════════════════════════════════
+   2. LOGIN SCREEN
+   Full-viewport centred panel shown before authentication.
+   Uses a navy-to-blue gradient background to signal an
+   official/HR system context.
+════════════════════════════════════════════════════════════ */
+
+/* Full-screen gradient backdrop */
+#loginScreen {
+  display:         flex;
+  align-items:     center;
+  justify-content: center;
+  min-height:      100vh;
+  background:      linear-gradient(135deg, #1a3a5c 0%, #2c5f8a 100%);
+}
+
+/* White card that contains the login form */
+.login-box {
+  background:    #fff;
+  border-radius: 16px;
+  padding:       40px 36px;
+  width:         340px;
+  box-shadow:    0 8px 32px rgba(0, 0, 0, .25);
+  text-align:    center;
+}
+
+/* Factory emoji icon above the title */
+.login-logo {
+  font-size:     2.5rem;
+  margin-bottom: 10px;
+}
+
+.login-box h2 {
+  font-size:     1.2rem;
+  color:         #1a3a5c;
+  font-weight:   700;
+  margin-bottom: 4px;
+}
+
+.login-sub {
+  font-size:     .82rem;
+  color:         #888;
+  margin-bottom: 20px;
+}
+
+/* Email and password inputs */
+.login-box input {
+  display:       block;
+  width:         100%;
+  padding:       11px 14px;
+  border:        1px solid #d0d8e4;
+  border-radius: 8px;
+  font-size:     .9rem;
+  margin-bottom: 12px;
+  outline:       none;
+  background:    #f8fafc;
+}
+
+.login-box input:focus {
+  border-color: #1a3a5c;
+}
+
+/* Sign In button — full width, dark navy */
+.btn-login {
+  width:          100%;
+  background:     #1a3a5c;
+  color:          #fff;
+  border:         none;
+  padding:        12px;
+  border-radius:  8px;
+  font-size:      .95rem;
+  font-weight:    700;
+  cursor:         pointer;
+  letter-spacing: .02em;
+}
+
+.btn-login:hover {
+  background: #24537f;
+}
+
+/* Error / status message below the button */
+.login-msg {
+  margin-top: 12px;
+  font-size:  .8rem;
+  color:      #c0392b;
+  min-height: 18px;
+}
+
+
+/* ════════════════════════════════════════════════════════════
+   3. HEADER
+   Sticky top bar with the app logo, DB status badge, live
+   clock, sign-out button, and the tab strip below it.
+════════════════════════════════════════════════════════════ */
+
+header {
+  background:  #1a3a5c;
+  color:       #fff;
+  position:    sticky;
+  top:         0;
+  z-index:     200;
+  box-shadow:  0 2px 8px rgba(0, 0, 0, .25);
+}
+
+/* Inner row: logo | badge | clock | sign-out */
+.header-inner {
+  display:     flex;
+  align-items: center;
+  gap:         14px;
+  padding:     10px 20px;
+}
+
+.logo {
+  font-size:   1.05rem;
+  font-weight: 700;
+}
+
+/* Live clock pushed to the right of the logo & badge */
+.hclock {
+  margin-left: auto;
+  font-size:   .75rem;
+  opacity:     .7;
+}
+
+/* ── Firebase connection badge ───────────────────────────── */
+.db-badge {
+  font-size:     .72rem;
+  padding:       3px 10px;
+  border-radius: 12px;
+  border:        1px solid;
+}
+
+.db-badge.connecting { color: #e3b341; border-color: #e3b341; }   /* yellow */
+.db-badge.connected  { color: #56d364; border-color: #56d364; }   /* green  */
+.db-badge.error      { color: #f78166; border-color: #f78166; }   /* red    */
+
+/* Sign Out button — subtle ghost style */
+.btn-logout {
+  background:  rgba(255, 255, 255, .15);
+  color:       #fff;
+  border:      1px solid rgba(255, 255, 255, .3);
+  padding:     6px 14px;
+  border-radius: 6px;
+  cursor:      pointer;
+  font-size:   .78rem;
+  font-weight: 600;
+}
+
+.btn-logout:hover {
+  background: rgba(255, 255, 255, .25);
+}
+
+
+/* ════════════════════════════════════════════════════════════
+   4. TAB NAVIGATION
+   Horizontal tab strip inside the header.
+   Active tab has a gold bottom border and full-white text.
+════════════════════════════════════════════════════════════ */
+
+.tabs {
+  display: flex;
+  padding: 0 20px;
+}
+
+.tab {
+  background:       transparent;
+  color:            rgba(255, 255, 255, .6);
+  border:           none;
+  border-bottom:    3px solid transparent;
+  padding:          9px 22px;
+  cursor:           pointer;
+  font-size:        .87rem;
+  font-weight:      600;
+  letter-spacing:   .02em;
+  transition:       .15s;
+}
+
+.tab:hover { color: #fff; }
+
+/* Gold underline accent on the active tab */
+.tab.active {
+  color:        #fff;
+  border-bottom-color: #f0a500;
+}
+
+
+/* ════════════════════════════════════════════════════════════
+   5. TAB CONTENT PANELS
+   Only the .active panel is visible at any time.
+════════════════════════════════════════════════════════════ */
+
+.tab-content         { display: none; }
+.tab-content.active  { display: block; }
+
+
+/* ════════════════════════════════════════════════════════════
+   6. LAYOUT CONTAINERS
+   .container      — narrow centred layout for Data Entry tab
+   .container-wide — full-width layout for the Dashboard tab
+════════════════════════════════════════════════════════════ */
+
+.container {
+  max-width: 900px;
+  margin:    0 auto;
+  padding:   20px 16px 40px;
+}
+
+.container-wide {
+  padding: 20px 16px 40px;
+}
+
+
+/* ════════════════════════════════════════════════════════════
+   7. CARDS
+   White rounded panels that wrap each section/form.
+════════════════════════════════════════════════════════════ */
+
+.card {
+  background:    #fff;
+  border-radius: 10px;
+  box-shadow:    0 2px 10px rgba(0, 0, 0, .07);
+  padding:       20px 24px;
+  margin-bottom: 18px;
+}
+
+/* Bold all-caps card title with a bottom border accent */
+.card-title {
+  font-size:      .88rem;
+  font-weight:    700;
+  color:          #1a3a5c;
+  border-bottom:  2px solid #e5eaf0;
+  padding-bottom: 10px;
+  margin-bottom:  16px;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+
+/* ════════════════════════════════════════════════════════════
+   8. FORM GRIDS & FIELDS
+   Three responsive grid sizes used across the app:
+     .form-grid       — standard fields (~200 px min col)
+     .form-grid-small — compact fields (~170 px min col)
+     .cost-grid       — very compact rate inputs (~145 px)
+════════════════════════════════════════════════════════════ */
+
+.form-grid {
+  display:               grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap:                   14px;
+}
+
+.form-grid-small {
+  display:               grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap:                   12px;
+}
+
+.cost-grid {
+  display:               grid;
+  grid-template-columns: repeat(auto-fill, minmax(145px, 1fr));
+  gap:                   12px;
+  margin-bottom:         14px;
+}
+
+/* ── Individual field wrapper (label + control) ─────────── */
+.field,
+.cost-field {
+  display:        flex;
+  flex-direction: column;
+  gap:            5px;
+}
+
+/* Small all-caps label above each control */
+.field label,
+.cost-field label {
+  font-size:      .7rem;
+  font-weight:    700;
+  color:          #5a6e84;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+
+/* Inputs and selects inside field wrappers */
+.field input,
+.field select,
+.cost-field input {
+  padding:       9px 10px;
+  border:        1px solid #d0d8e4;
+  border-radius: 6px;
+  font-size:     .88rem;
+  background:    #f8fafc;
+  outline:       none;
+  width:         100%;
+  transition:    .15s;
+}
+
+.field input:focus,
+.field select:focus,
+.cost-field input:focus {
+  border-color: #1a3a5c;
+  background:   #fff;
+}
+
+/* Read-only preview fields (e.g. OT cost preview) */
+.field input[readonly] {
+  background: #f0f4f8;
+  color:      #666;
+}
+
+/* Inline form actions bar at the bottom of a card section */
+.form-actions {
+  display:      flex;
+  align-items:  center;
+  gap:          12px;
+  margin-top:   14px;
+  padding-top:  14px;
+  border-top:   1px solid #eef0f4;
+}
+
+/* Small green confirmation text after a save action */
+.save-status {
+  font-size:   .8rem;
+  font-weight: 600;
+  color:       #1e8449;
+}
+
+
+/* ════════════════════════════════════════════════════════════
+   9. BUTTONS
+   Consistent button styles used throughout the app.
+════════════════════════════════════════════════════════════ */
+
+/* Primary save action — dark navy */
+.btn-save {
+  background:     #1a3a5c;
+  color:          #fff;
+  border:         none;
+  padding:        10px 22px;
+  border-radius:  6px;
+  font-size:      .83rem;
+  font-weight:    700;
+  cursor:         pointer;
+  transition:     .15s;
+}
+
+.btn-save:hover { background: #24537f; }
+
+/* Secondary clear/cancel action — white with border */
+.btn-clear {
+  background:    #fff;
+  color:         #666;
+  border:        1px solid #d0d8e4;
+  padding:       10px 16px;
+  border-radius: 6px;
+  font-size:     .83rem;
+  cursor:        pointer;
+}
+
+.btn-clear:hover { background: #f5f5f5; }
+
+/* Add-row button — green, signals a non-destructive append */
+.btn-add {
+  background:    #1e8449;
+  color:         #fff;
+  border:        none;
+  padding:       10px 20px;
+  border-radius: 6px;
+  font-size:     .83rem;
+  font-weight:   700;
+  cursor:        pointer;
+  transition:    .15s;
+}
+
+.btn-add:hover { background: #27ae60; }
+
+/* Destructive delete button — red/pink, used for Clear Records */
+.btn-delete {
+  background:    #fde8e8;
+  border:        1px solid #f5c6c6;
+  color:         #c0392b;
+  padding:       9px 16px;
+  border-radius: 6px;
+  font-size:     .82rem;
+  font-weight:   700;
+  cursor:        pointer;
+  align-self:    flex-end;
+}
+
+.btn-delete:hover {
+  background: #c0392b;
+  color:      #fff;
+}
+
+
+/* ════════════════════════════════════════════════════════════
+   10. FILTER BAR
+   Horizontal row of date pickers, shift selector, and
+   action buttons above the dashboard table.
+════════════════════════════════════════════════════════════ */
+
+.filter-bar {
+  background:    #fff;
+  border-radius: 10px;
+  box-shadow:    0 2px 10px rgba(0, 0, 0, .07);
+  padding:       14px 18px;
+  display:       flex;
+  flex-wrap:     wrap;
+  gap:           10px;
+  align-items:   flex-end;
+  margin-bottom: 16px;
+}
+
+/* Small labelled inline field used inside the filter bar */
+.field-inline {
+  display:        flex;
+  flex-direction: column;
+  gap:            4px;
+}
+
+.field-inline label {
+  font-size:      .7rem;
+  font-weight:    700;
+  color:          #5a6e84;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+
+.field-inline input,
+.field-inline select {
+  padding:       8px 10px;
+  border:        1px solid #d0d8e4;
+  border-radius: 6px;
+  font-size:     .85rem;
+  background:    #f8fafc;
+  outline:       none;
+}
+
+/* "Refresh Dashboard" button */
+.btn-apply {
+  background:    #1a3a5c;
+  color:         #fff;
+  border:        none;
+  padding:       9px 16px;
+  border-radius: 6px;
+  font-size:     .82rem;
+  font-weight:   700;
+  cursor:        pointer;
+  align-self:    flex-end;
+}
+
+.btn-apply:hover { background: #24537f; }
+
+/* Export buttons (CSV, Image) — light ghost style */
+.btn-export {
+  background:    #f8fafc;
+  border:        1px solid #d0d8e4;
+  color:         #444;
+  padding:       9px 16px;
+  border-radius: 6px;
+  font-size:     .82rem;
+  cursor:        pointer;
+  align-self:    flex-end;
+}
+
+.btn-export:hover { background: #e8eef5; }
+
+
+/* ════════════════════════════════════════════════════════════
+   11. TABLES — BASE STYLES
+   All tables share these foundational styles.
+   The dashboard table (#dashTable) has a 1200 px min-width
+   to enforce horizontal scrolling rather than squeezing.
+════════════════════════════════════════════════════════════ */
+
+.table-scroll {
+  overflow-x:    auto;
+  border-radius: 10px;
+  box-shadow:    0 2px 10px rgba(0, 0, 0, .07);
+}
+
+table {
+  border-collapse: collapse;
+  font-size:       12px;
+  width:           100%;
+  background:      #fff;
+}
+
+/* Minimum width keeps the 24-column dashboard table readable */
+#dashTable { min-width: 1200px; }
+
+th {
+  padding:       7px 8px;
+  text-align:    center;
+  border:        1px solid #b0bec5;
+  white-space:   nowrap;
+}
+
+td {
+  padding:       6px 8px;
+  text-align:    center;
+  border:        1px solid #dde3eb;
+  white-space:   nowrap;
+}
+
+/* Left-aligned text cells (date column, company name, etc.) */
+td.left { text-align: left; }
+
+
+/* ════════════════════════════════════════════════════════════
+   12. TABLES — GROUP HEADER COLOURS
+   Each supplier / data category gets its own coloured header
+   spanning its column group. Chosen to be visually distinct
+   so the eye can quickly locate a supplier's columns.
+════════════════════════════════════════════════════════════ */
+
+.grp-mc      { background: #1a3a5c; color: #fff; }   /* Navy   — MC Caters      */
+.grp-biscuit { background: #5b2d8e; color: #fff; }   /* Purple — Biscuits       */
+.grp-sam     { background: #8b3300; color: #fff; }   /* Brown  — SAM Bake House */
+.grp-sujeewa { background: #155a35; color: #fff; }   /* Green  — Sujeewa        */
+.grp-nilu    { background: #154360; color: #fff; }   /* Teal   — Nilu           */
+.grp-walgama { background: #6d5504; color: #fff; }   /* Olive  — Walgama Hotel  */
+.grp-mp      { background: #333;    color: #fff; vertical-align: middle; }  /* Dark — Manpower */
+.grp-ot      { background: #4a235a; color: #fff; }   /* Purple — OT             */
+.grp-total   { background: #c0392b; color: #fff; vertical-align: middle; }  /* Red  — Daily Total */
+
+/* Sub-header row (column labels below the group row) */
+.th-sub th {
+  background:     #eef3f9;
+  color:          #2c3e50;
+  font-size:      .69rem;
+  font-weight:    700;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+/* Rate row (shows per-unit cost under tea quantity columns) */
+.th-rate th    { background: #dce8f5; color: #1a3a5c; font-size: .7rem; }
+.rate-cell     { font-weight: 800 !important; }
+
+
+/* ════════════════════════════════════════════════════════════
+   13. TABLES — ROW STYLES & SHIFT BADGES
+════════════════════════════════════════════════════════════ */
+
+/* Subtle zebra striping on data rows */
+tbody tr:nth-child(even) { background: #f9fbfd; }
+tbody tr:hover            { background: #e8f0f8; }
+
+/* Column sizing for fixed-width columns */
+.col-date  { min-width: 115px; text-align: left !important; padding-left: 10px !important; }
+.col-shift { min-width:  68px; }
+.col-total { min-width: 105px; }
+
+/* MC Caters sub-total column — light blue tint to stand out */
+.subtotal-col { background: #d9e5f2 !important; font-weight: 700; }
+
+/* ── Shift badges ─────────────────────────────────────────── */
+/* DAY shift — light blue */
+.badge-day {
+  background:    #d6eaf8;
+  color:         #1a5276;
+  border-radius: 4px;
+  padding:       2px 7px;
+  font-weight:   700;
+  font-size:     .7rem;
+  display:       inline-block;
+}
+
+/* NIGHT shift — light amber */
+.badge-night {
+  background:    #fef9e7;
+  color:         #7d6608;
+  border-radius: 4px;
+  padding:       2px 7px;
+  font-weight:   700;
+  font-size:     .7rem;
+  display:       inline-block;
+}
+
+/* Currency value cells */
+td.money  { color: #1a3a5c; font-weight: 700; }
+
+/* Placeholder dash for empty/zero values */
+.dash { color: #ccc; }
+
+/* OT specific cells */
+td.ot-hrs  { color: #4a235a; font-weight: 700; }
+td.ot-cost { color: #4a235a; font-weight: 700; }
+
+/* Daily total cell — red tint to highlight the row summary */
+td.day-total { background: #fde8e8; color: #c0392b; font-weight: 800; }
+
+
+/* ════════════════════════════════════════════════════════════
+   14. TABLES — FOOTER
+   Grand total row shown at the bottom of the dashboard table.
+   Uses a dark navy background to visually anchor the table.
+════════════════════════════════════════════════════════════ */
+
+tfoot tr td { font-weight: 700; font-size: .8rem; }
+
+/* Grand total row — full dark navy with white text */
+tfoot tr.grand-row td {
+  background: #1a3a5c !important;
+  color:      #fff !important;
+  font-weight: 800;
+}
+
+/* Centred italic placeholder when no data is present */
+.loading-cell {
+  text-align:  center !important;
+  padding:     28px !important;
+  color:       #aaa;
+  font-style:  italic;
+}
+
+
+/* ════════════════════════════════════════════════════════════
+   15. OT ENTRY EXTRAS
+   Small supplementary styles for the OT Entry card.
+════════════════════════════════════════════════════════════ */
+
+/* Dimmed formula hint displayed in the card title bar */
+.ot-formula-note {
+  font-size:      .72rem;
+  color:          #888;
+  font-weight:    400;
+  margin-left:    10px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* Amber banner showing the active Master OT Rate */
+.ot-rate-banner {
+  background:    #fff8e1;
+  border:        1px solid #f0a500;
+  border-radius: 6px;
+  padding:       8px 14px;
+  font-size:     .82rem;
+  color:         #555;
+  margin-bottom: 14px;
+}
+
+.ot-rate-banner strong {
+  color:     #1a3a5c;
+  font-size: .95rem;
+}
+
+
+/* ════════════════════════════════════════════════════════════
+   16. TOAST NOTIFICATION
+   Fixed bottom-right notification that slides in/out.
+   Two states: .ok (green success) and .err (red error).
+   Auto-dismissed after 3 seconds by app.js.
+════════════════════════════════════════════════════════════ */
+
+#toast {
+  position:        fixed;
+  bottom:          22px;
+  right:           18px;
+  padding:         10px 18px;
+  border-radius:   8px;
+  font-weight:     700;
+  font-size:       .83rem;
+  color:           #fff;
+  transform:       translateY(60px);   /* hidden below viewport */
+  opacity:         0;
+  transition:      .3s;
+  z-index:         9999;
+}
+
+/* Slide-in state */
+#toast.show { transform: translateY(0); opacity: 1; }
+
+#toast.ok  { background: #1e8449; }   /* green */
+#toast.err { background: #c0392b; }   /* red   */
+
+
+/* ════════════════════════════════════════════════════════════
+   17. UTILITY CLASSES
+════════════════════════════════════════════════════════════ */
+
+/* Add to any table column to hide it on mobile screens */
+.hide-mobile { /* applied via @media below */ }
+
+
+/* ════════════════════════════════════════════════════════════
+   18. MOBILE RESPONSIVE (≤ 768 px)
+   Key principles:
+   • Forms collapse to single column
+   • Tables use horizontal scroll (never wrap/squeeze)
+   • Buttons go full-width for easier tap targets
+   • Header stacks vertically
+════════════════════════════════════════════════════════════ */
 
 @media (max-width: 768px) {
 
-  /* Reduce padding everywhere */
-  body {
-    font-size: 14px;
-  }
+  /* Slightly larger base font on small screens */
+  body { font-size: 14px; }
 
-  .container, .container-wide {
-    padding: 10px;
-  }
+  /* Tighter page padding */
+  .container,
+  .container-wide { padding: 10px; }
 
-  /* Header becomes stacked */
+  /* ── Header: stack logo, badge, clock, button vertically ── */
   .header-inner {
     flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
+    align-items:    flex-start;
+    gap:            8px;
   }
 
-  .tabs {
-    flex-wrap: wrap;
-  }
+  /* Tabs wrap and each takes equal space */
+  .tabs    { flex-wrap: wrap; }
+  .tab     { flex: 1; text-align: center; padding: 10px; font-size: 13px; }
 
-  .tab {
-    flex: 1;
-    text-align: center;
-    padding: 10px;
-    font-size: 13px;
-  }
+  /* Cards tighter on mobile */
+  .card          { padding: 12px; margin-bottom: 12px; }
+  .card-title    { font-size: 15px; }
 
-  /* Cards spacing */
-  .card {
-    padding: 12px;
-    margin-bottom: 12px;
-  }
-
-  .card-title {
-    font-size: 15px;
-  }
-
-  /* Forms become single column */
+  /* ── All form grids collapse to a single column ─────────── */
   .form-grid,
   .form-grid-small,
   .cost-grid {
@@ -221,45 +769,24 @@ td.day-total{background:#fde8e8;color:#c0392b;font-weight:800;}
     gap: 10px;
   }
 
-  /* Inputs full width */
-  input, select {
-    width: 100%;
-    font-size: 14px;
-  }
+  /* Inputs full width for comfortable typing */
+  input,
+  select { width: 100%; font-size: 14px; }
 
-  /* Buttons full width for easier tap */
-  .form-actions {
-    flex-direction: column;
-    gap: 8px;
-  }
+  /* Buttons stack vertically and go full width for easy tapping */
+  .form-actions  { flex-direction: column; gap: 8px; }
+  button         { width: 100%; }
 
-  button {
-    width: 100%;
-  }
-
-  /* =========================
-     TABLE FIX (MOST IMPORTANT)
-  ========================= */
-
+  /* ── Tables: always scroll horizontally — never squeeze ─── */
   .table-scroll {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
+    overflow-x:                 auto;
+    -webkit-overflow-scrolling: touch;   /* smooth momentum scroll on iOS */
   }
 
-  table {
-    min-width: 900px; /* force scroll instead of squeezing */
-  }
+  table  { min-width: 900px; }   /* forces scroll before columns compress */
 
-  th, td {
-    font-size: 12px;
-    padding: 6px;
-    white-space: nowrap;
-  }
+  th, td { font-size: 12px; padding: 6px; white-space: nowrap; }
 
-  /* Hide less important columns on mobile */
-  .hide-mobile {
-    display: none !important;
-  }
-
-
+  /* Columns marked hide-mobile are removed on small screens */
+  .hide-mobile { display: none !important; }
 }
