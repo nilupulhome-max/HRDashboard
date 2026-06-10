@@ -128,8 +128,23 @@ body {
   color:      #c0392b;
   min-height: 18px;
 }
+.login-box Nsoft {
+  font-size:     1.2rem;
+  color:         #1a3a5c;
+  font-weight:   700;
+  margin-bottom: 4px;
+}
 
+.powered-by {
+  margin-top: 18px;
+  font-size: .72rem;
+  color: #aab;
+}
 
+.powered-by strong {
+  color: #1a3a5c;
+  font-weight: 700;
+}
 /* ════════════════════════════════════════════════════════════
    3. HEADER
    Sticky top bar with the app logo, DB status badge, live
