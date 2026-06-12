@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>HR Canteen System</title>
+  <title>HR Dashboard System</title>
 
   <!-- ── Styles ─────────────────────────────────────────── -->
   <link rel="stylesheet" href="styles.css"/>
@@ -266,6 +266,49 @@
   <div id="tab-dashboard" class="tab-content">
   <div class="container-wide">
 
+    <!-- ══════════════════════════════════════════════════
+     ATTENDANCE MASTER — Total Required Carder only
+     Collection : attendance_masters
+     Doc ID     : "{dept}_{shift}"
+══════════════════════════════════════════════════ -->
+<div class="card">
+  <div class="card-title">👥 Attendance — Carder Master (Revised Required)</div>
+
+  <div class="table-scroll">
+    <table id="att-master-table">
+      <thead>
+        <tr class="th-sub">
+          <th class="left" style="padding:8px 10px;min-width:140px;">Department</th>
+          <th style="padding:8px 10px;">Shift</th>
+          <th style="padding:8px 10px;min-width:120px;">Total Required Carder (Revised)</th>
+          <th style="padding:8px 10px;width:80px;">Edit</th>
+        </tr>
+      </thead>
+      <tbody id="att-master-body">
+        <tr><td colspan="4" class="loading-cell">⏳ Loading…</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Inline edit panel -->
+  <div id="att-edit-panel" style="display:none;margin-top:16px;padding-top:16px;border-top:1px solid #eef0f4;">
+    <div style="font-size:.8rem;font-weight:700;color:#1a3a5c;margin-bottom:12px;">
+      ✎ Editing: <span id="att-edit-label"></span>
+    </div>
+    <div class="form-grid-small">
+      <div class="field">
+        <label>Total Required Carder (Revised)</label>
+        <input type="number" id="att-e-revised" min="0" value="0"/>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn-save" onclick="saveAttMaster()">💾 Save</button>
+      <button class="btn-clear" onclick="closeAttEdit()">✕ Cancel</button>
+      <span class="save-status" id="att-m-status"></span>
+    </div>
+  </div>
+
+</div>
 
     <!-- ══════════════════════════════════════════════════
          A. COST CONFIGURATION (HR Only)
@@ -397,6 +440,62 @@
       </div>
     </div><!-- /card: manpower summary -->
 
+    <!-- ══════════════════════════════════════════════════
+     ATTENDANCE DAILY ENTRY
+     Collection : attendance_daily
+     Doc ID     : "{date}"  e.g. "2026-06-11"
+     Each doc holds an array of rows, one per dept+shift
+══════════════════════════════════════════════════ -->
+<div class="card">
+  <div class="card-title">📋 Daily Attendance Entry</div>
+
+  <div class="form-grid-small" style="margin-bottom:14px;">
+    <div class="field">
+      <label>Date</label>
+      <input type="date" id="att-date"/>
+    </div>
+  </div>
+
+  <div class="table-scroll">
+    <table id="att-entry-table">
+      <thead>
+        <tr class="th-group">
+          <th rowspan="2" class="left col-date">Department</th>
+          <th rowspan="2">Shift</th>
+          <th rowspan="2">Revised Required</th>
+          <th colspan="4" class="grp-mc">Attendance</th>
+          <th rowspan="2">Day Off</th>
+          <th rowspan="2">Long Absent (&gt;4)</th>
+          <th rowspan="2">Turnover</th>
+          <th rowspan="2">Recruitment</th>
+          <th colspan="4" class="grp-sujeewa">Calculated</th>
+        </tr>
+        <tr class="th-sub">
+          <th>Present</th>
+          <th>Informed</th>
+          <th>Un-informed</th>
+          <th>Total Absent</th>
+          <th>On Roll</th>
+          <th>Excess/(Short)</th>
+          <th>Absenteeism %</th>
+          <th>Turnover %</th>
+        </tr>
+      </thead>
+      <tbody id="att-entry-body">
+        <tr><td colspan="15" class="loading-cell">Select a date to load.</td></tr>
+      </tbody>
+      <tfoot id="att-entry-foot"></tfoot>
+    </table>
+  </div>
+
+<div class="form-actions" style="margin-top:14px;">
+  <button class="btn-save" onclick="saveAttDaily()">💾 Save Attendance</button>
+  <button class="btn-export" onclick="exportAttImage()">📷 Export Image</button>  <!-- ← add this -->
+  <span class="save-status" id="att-daily-status"></span>
+</div>
+  
+
+</div>
 
     <!-- ══════════════════════════════════════════════════
          D. OT ENTRY (placed in Dashboard tab)

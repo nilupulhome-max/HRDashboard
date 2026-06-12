@@ -95,6 +95,8 @@ auth.onAuthStateChanged(user => {
       loadMpRates();   // populates the Manpower Rates table & dropdowns
       loadMpEntry();   // loads today's manpower entry rows
       loadOTEntry();   // loads today's OT hours
+      loadAttMasters(); //load attendence masters
+      initAttDailyDate(); /// sets today's date and loads attendance
     });
   } else {
     // User is signed out — show login screen
@@ -1441,3 +1443,474 @@ function toast(msg, err = false) {
   t.className   = err ? 'show err' : 'show ok';
   setTimeout(() => t.className = '', 3000);
 }
+
+// ════════════════════════════════════════════════════════════
+//  ATTENDANCE — MASTER DATA
+//  Firestore collection : attendance_masters
+//  Document ID          : "{dept}_{shift}"
+//
+//  Only one editable value per row: revised (Total Required
+//  Carder Revised). Everything else is calculated from the
+//  daily attendance entry.
+// ════════════════════════════════════════════════════════════
+
+const ATT_DEPTS = [
+  { dept: 'Stores',          shift: 'General'  },
+  { dept: 'Stores',          shift: 'Shift A'  },
+  { dept: 'Stores',          shift: 'Shift B'  },
+  { dept: 'Quality',         shift: 'General'  },
+  { dept: 'Quality',         shift: 'Shift A'  },
+  { dept: 'Quality',         shift: 'Shift B'  },
+  { dept: 'Quality',         shift: 'Orit'     },
+  { dept: 'Special Section', shift: 'General'  },
+  { dept: 'Washing',         shift: 'General'  },
+  { dept: 'Washing',         shift: 'Shift A'  },
+  { dept: 'Washing',         shift: 'Shift B'  },
+  { dept: 'Sub Chemical',    shift: 'General'  },
+  { dept: 'Sub Chemical',    shift: 'Shift A'  },
+  { dept: 'Sub Chemical',    shift: 'Shift B'  },
+  { dept: 'Sample',          shift: 'General'  },
+  { dept: 'Sample',          shift: 'Shift A'  },
+  { dept: 'Sample',          shift: 'Shift B'  },
+  { dept: 'Maintenance',     shift: 'General'  },
+  { dept: 'Maintenance',     shift: 'Shift A'  },
+  { dept: 'Maintenance',     shift: 'Shift B'  },
+  { dept: 'R & D',           shift: 'General'  },
+  { dept: 'ERP',             shift: 'Shift A'  },
+  { dept: 'ERP',             shift: 'Shift B'  },
+  { dept: 'Marketing',       shift: 'General'  },
+  { dept: 'HR',              shift: 'General'  },
+];
+
+let attMasters    = {};   // cache keyed by "{dept}_{shift}"
+let attMasterEditId = null;
+
+// ── loadAttMasters ───────────────────────────────────────────
+// Fetches docs, seeds any missing rows with revised = 0.
+async function loadAttMasters() {
+  try {
+    const snap = await db.collection('attendance_masters').get();
+    attMasters = {};
+    snap.forEach(d => { attMasters[d.id] = { id: d.id, ...d.data() }; });
+
+    // First-time seed — create blank docs for any missing rows
+    const batch = db.batch();
+    let needsWrite = false;
+    ATT_DEPTS.forEach(({ dept, shift }) => {
+      const key = `${dept}_${shift}`;
+      if (!attMasters[key]) {
+        const ref = db.collection('attendance_masters').doc(key);
+        batch.set(ref, { dept, shift, revised: 0 });
+        attMasters[key] = { id: key, dept, shift, revised: 0 };
+        needsWrite = true;
+      }
+    });
+    if (needsWrite) await batch.commit();
+
+    renderAttMasterTable();
+  } catch (e) {
+    console.error('loadAttMasters:', e);
+    toast('Error loading attendance masters: ' + e.message, true);
+  }
+}
+
+// ── renderAttMasterTable ─────────────────────────────────────
+// Renders all rows in fixed order. Dept name shown only on
+// the first row of each dept group.
+function renderAttMasterTable() {
+  const tbody    = document.getElementById('att-master-body');
+  let   html     = '';
+  let   lastDept = null;
+
+  ATT_DEPTS.forEach(({ dept, shift }) => {
+    const key = `${dept}_${shift}`;
+    const r   = attMasters[key] || { revised: 0 };
+
+    const deptCell = dept !== lastDept
+      ? `<td class="left" style="padding:6px 10px;font-weight:700;">${dept}</td>`
+      : `<td class="left" style="padding:6px 10px;color:#ccc;">↳</td>`;
+    lastDept = dept;
+
+    const badge = shift === 'General'
+      ? `<span class="badge-day">${shift}</span>`
+      : `<span class="badge-night">${shift}</span>`;
+
+    html += `<tr>
+      ${deptCell}
+      <td style="padding:6px 10px;text-align:center;">${badge}</td>
+      <td style="padding:6px 10px;text-align:center;font-weight:700;color:#1a3a5c;">
+        ${r.revised || '—'}
+      </td>
+      <td style="padding:6px 10px;text-align:center;">
+        <button onclick="openAttEdit('${key}')"
+          style="background:#e8f0f8;color:#1a3a5c;border:none;padding:4px 12px;
+          border-radius:4px;cursor:pointer;font-size:.75rem;font-weight:600;">
+          ✎ Edit
+        </button>
+      </td>
+    </tr>`;
+  });
+
+  tbody.innerHTML = html;
+}
+
+// ── openAttEdit ──────────────────────────────────────────────
+function openAttEdit(key) {
+  const r = attMasters[key];
+  if (!r) return;
+  attMasterEditId = key;
+  document.getElementById('att-edit-label').textContent   = `${r.dept} — ${r.shift}`;
+  document.getElementById('att-e-revised').value          = r.revised || 0;
+  document.getElementById('att-m-status').textContent     = '';
+  document.getElementById('att-edit-panel').style.display = '';
+  document.getElementById('att-edit-panel')
+    .scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// ── closeAttEdit ─────────────────────────────────────────────
+function closeAttEdit() {
+  attMasterEditId = null;
+  document.getElementById('att-edit-panel').style.display = 'none';
+}
+
+// ── saveAttMaster ────────────────────────────────────────────
+async function saveAttMaster() {
+  if (!attMasterEditId) return;
+  const revised = parseFloat(document.getElementById('att-e-revised').value) || 0;
+  try {
+    await db.collection('attendance_masters')
+      .doc(attMasterEditId)
+      .update({ revised, savedAt: new Date().toISOString() });
+
+    // Update cache without full reload
+    attMasters[attMasterEditId].revised = revised;
+
+    renderAttMasterTable();
+    closeAttEdit();
+    toast('Carder updated!');
+    document.getElementById('att-m-status').textContent = '✔ Saved!';
+    setTimeout(() => document.getElementById('att-m-status').textContent = '', 3000);
+  } catch (e) {
+    toast('Save error: ' + e.message, true);
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+//  ATTENDANCE — DAILY ENTRY
+//  Firestore collection : attendance_daily
+//  Document ID          : "{date}"  e.g. "2026-06-11"
+//
+//  Each document stores one "rows" array — one element per
+//  dept+shift combination (follows ATT_DEPTS order).
+//
+//  Entered by HR     : present, informed, uninformed,
+//                      dayoff, longabsent, turnover, recruitment
+//  Calculated on save: totalAbsent, onRoll, excess,
+//                      absPct, turnoverPct
+// ════════════════════════════════════════════════════════════
+
+// In-memory grid of input values for the current date.
+// Keyed by "{dept}_{shift}" — matches ATT_DEPTS keys.
+let attDailyRows = {};
+
+// ── initAttDailyDate ─────────────────────────────────────────
+// Sets today's date in the att-date picker and loads data.
+function initAttDailyDate() {
+  const now = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  document.getElementById('att-date').value =
+    `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
+  loadAttDaily();
+}
+
+// ── loadAttDaily ─────────────────────────────────────────────
+// Fetches the attendance document for the selected date.
+// Builds attDailyRows from saved data (or zeros for new date).
+// Then renders the editable table.
+async function loadAttDaily() {
+  const date = document.getElementById('att-date').value;
+  if (!date) return;
+
+  const tbody = document.getElementById('att-entry-body');
+  tbody.innerHTML = '<tr><td colspan="15" class="loading-cell">⏳ Loading…</td></tr>';
+
+  try {
+    const doc = await db.collection('attendance_daily').doc(date).get();
+    const saved = doc.exists ? (doc.data().rows || []) : [];
+
+    // Build a lookup from saved rows by key
+    const savedMap = {};
+    saved.forEach(r => { savedMap[`${r.dept}_${r.shift}`] = r; });
+
+    // Initialise attDailyRows — use saved values or zeros
+    attDailyRows = {};
+    ATT_DEPTS.forEach(({ dept, shift }) => {
+      const key = `${dept}_${shift}`;
+      const s   = savedMap[key] || {};
+      attDailyRows[key] = {
+        dept, shift,
+        present:     s.present     || 0,
+        informed:    s.informed    || 0,
+        uninformed:  s.uninformed  || 0,
+        dayoff:      s.dayoff      || 0,
+        longabsent:  s.longabsent  || 0,
+        turnover:    s.turnover    || 0,
+        recruitment: s.recruitment || 0,
+      };
+    });
+
+    renderAttEntryTable();
+  } catch (e) {
+    console.error('loadAttDaily:', e);
+    toast('Error loading attendance: ' + e.message, true);
+  }
+}
+
+// ── renderAttEntryTable ──────────────────────────────────────
+// Renders every dept+shift row as an editable table row.
+// Calculated columns (total absent, on roll, excess, %)
+// are computed live from the current input values and shown
+// as read-only cells. They update on every input event.
+function renderAttEntryTable() {
+  const tbody    = document.getElementById('att-entry-body');
+  const tfoot    = document.getElementById('att-entry-foot');
+  let   html     = '';
+  let   lastDept = null;
+
+  // Grand total accumulators
+  let GT = {
+    revised:0, present:0, informed:0, uninformed:0, totalAbsent:0,
+    onRoll:0, dayoff:0, longabsent:0, turnover:0, recruitment:0,
+    excess:0
+  };
+
+  ATT_DEPTS.forEach(({ dept, shift }) => {
+    const key     = `${dept}_${shift}`;
+    const r       = attDailyRows[key];
+    const master  = attMasters[key] || { revised: 0 };
+    const revised = master.revised || 0;
+
+    // Calculated fields
+    const totalAbsent = (r.informed || 0) + (r.uninformed || 0);
+    const onRoll      = (r.present  || 0) + totalAbsent + (r.dayoff || 0);
+    const excess      = onRoll - revised;
+    const absPct      = onRoll > 0
+      ? ((totalAbsent / onRoll) * 100).toFixed(1) + '%'
+      : '—';
+    const tvPct       = onRoll > 0
+      ? ((( r.turnover || 0) / onRoll) * 100).toFixed(1) + '%'
+      : '—';
+
+    // Accumulate totals
+    GT.revised     += revised;
+    GT.present     += r.present     || 0;
+    GT.informed    += r.informed    || 0;
+    GT.uninformed  += r.uninformed  || 0;
+    GT.totalAbsent += totalAbsent;
+    GT.onRoll      += onRoll;
+    GT.dayoff      += r.dayoff      || 0;
+    GT.longabsent  += r.longabsent  || 0;
+    GT.turnover    += r.turnover    || 0;
+    GT.recruitment += r.recruitment || 0;
+    GT.excess      += excess;
+
+    // Dept name — show only on first row of each group
+    const deptCell = dept !== lastDept
+      ? `<td class="left" style="padding:6px 8px;font-weight:700;white-space:nowrap;">${dept}</td>`
+      : `<td class="left" style="padding:6px 8px;color:#ccc;">↳</td>`;
+    lastDept = dept;
+
+    const badge = shift === 'General'
+      ? `<span class="badge-day">${shift}</span>`
+      : `<span class="badge-night">${shift}</span>`;
+
+    // Excess cell colour: positive = good, negative = bad
+    const excessStyle = excess >= 0
+      ? 'color:#1e8449;font-weight:700;'
+      : 'color:#c0392b;font-weight:700;';
+    const excessDisplay = excess >= 0 ? `+${excess}` : `(${Math.abs(excess)})`;
+
+    // Each editable input calls attInput(key, field, value) on change
+    html += `<tr>
+      ${deptCell}
+      <td style="padding:5px 8px;text-align:center;">${badge}</td>
+      <td style="padding:5px 8px;text-align:center;font-weight:700;color:#1a3a5c;">${revised || '—'}</td>
+      <td style="padding:4px 6px;">
+        <input type="number" min="0" value="${r.present}"
+          style="width:54px;padding:4px 6px;border:1px solid #d0d8e4;border-radius:4px;font-size:.82rem;text-align:center;"
+          oninput="attInput('${key}','present',this.value)"/>
+      </td>
+      <td style="padding:4px 6px;">
+        <input type="number" min="0" value="${r.informed}"
+          style="width:54px;padding:4px 6px;border:1px solid #d0d8e4;border-radius:4px;font-size:.82rem;text-align:center;"
+          oninput="attInput('${key}','informed',this.value)"/>
+      </td>
+      <td style="padding:4px 6px;">
+        <input type="number" min="0" value="${r.uninformed}"
+          style="width:54px;padding:4px 6px;border:1px solid #d0d8e4;border-radius:4px;font-size:.82rem;text-align:center;"
+          oninput="attInput('${key}','uninformed',this.value)"/>
+      </td>
+      <td style="padding:5px 8px;text-align:center;font-weight:700;">${totalAbsent || '—'}</td>
+      <td style="padding:4px 6px;">
+        <input type="number" min="0" value="${r.dayoff}"
+          style="width:54px;padding:4px 6px;border:1px solid #d0d8e4;border-radius:4px;font-size:.82rem;text-align:center;"
+          oninput="attInput('${key}','dayoff',this.value)"/>
+      </td>
+      <td style="padding:4px 6px;">
+        <input type="number" min="0" value="${r.longabsent}"
+          style="width:54px;padding:4px 6px;border:1px solid #d0d8e4;border-radius:4px;font-size:.82rem;text-align:center;"
+          oninput="attInput('${key}','longabsent',this.value)"/>
+      </td>
+      <td style="padding:4px 6px;">
+        <input type="number" min="0" value="${r.turnover}"
+          style="width:54px;padding:4px 6px;border:1px solid #d0d8e4;border-radius:4px;font-size:.82rem;text-align:center;"
+          oninput="attInput('${key}','turnover',this.value)"/>
+      </td>
+      <td style="padding:4px 6px;">
+        <input type="number" min="0" value="${r.recruitment}"
+          style="width:54px;padding:4px 6px;border:1px solid #d0d8e4;border-radius:4px;font-size:.82rem;text-align:center;"
+          oninput="attInput('${key}','recruitment',this.value)"/>
+      </td>
+      <td style="padding:5px 8px;text-align:center;font-weight:700;">${onRoll || '—'}</td>
+      <td style="padding:5px 8px;text-align:center;${excessStyle}">${excessDisplay}</td>
+      <td style="padding:5px 8px;text-align:center;">${absPct}</td>
+      <td style="padding:5px 8px;text-align:center;">${tvPct}</td>
+    </tr>`;
+  });
+
+  tbody.innerHTML = html;
+
+  // ── Grand total footer row ─────────────────────────────────
+  const gtAbsPct = GT.onRoll > 0
+    ? ((GT.totalAbsent / GT.onRoll) * 100).toFixed(1) + '%' : '—';
+  const gtTvPct  = GT.onRoll > 0
+    ? ((GT.turnover    / GT.onRoll) * 100).toFixed(1) + '%' : '—';
+  const gtExcess = GT.excess >= 0 ? `+${GT.excess}` : `(${Math.abs(GT.excess)})`;
+
+  tfoot.innerHTML = `<tr class="grand-row">
+    <td colspan="2" class="left" style="padding-left:10px;">TOTAL</td>
+    <td style="padding:7px 8px;text-align:center;">${GT.revised}</td>
+    <td style="padding:7px 8px;text-align:center;">${GT.present}</td>
+    <td style="padding:7px 8px;text-align:center;">${GT.informed}</td>
+    <td style="padding:7px 8px;text-align:center;">${GT.uninformed}</td>
+    <td style="padding:7px 8px;text-align:center;">${GT.totalAbsent}</td>
+    <td style="padding:7px 8px;text-align:center;">${GT.dayoff}</td>
+    <td style="padding:7px 8px;text-align:center;">${GT.longabsent}</td>
+    <td style="padding:7px 8px;text-align:center;">${GT.turnover}</td>
+    <td style="padding:7px 8px;text-align:center;">${GT.recruitment}</td>
+    <td style="padding:7px 8px;text-align:center;">${GT.onRoll}</td>
+    <td style="padding:7px 8px;text-align:center;">${gtExcess}</td>
+    <td style="padding:7px 8px;text-align:center;">${gtAbsPct}</td>
+    <td style="padding:7px 8px;text-align:center;">${gtTvPct}</td>
+  </tr>`;
+}
+
+// ── attInput ─────────────────────────────────────────────────
+// Called on every input event. Updates attDailyRows in memory
+// and re-renders the table so calculated columns update live.
+function attInput(key, field, value) {
+  if (!attDailyRows[key]) return;
+  attDailyRows[key][field] = parseFloat(value) || 0;
+  renderAttEntryTable();
+}
+
+// ── saveAttDaily ─────────────────────────────────────────────
+// Saves all rows for the selected date to Firestore.
+// Pre-computes all calculated fields before storing so the
+// dashboard can read them directly without recalculating.
+async function saveAttDaily() {
+  const date = document.getElementById('att-date').value;
+  if (!date) { toast('Select a date first', true); return; }
+
+  const rows = ATT_DEPTS.map(({ dept, shift }) => {
+    const key     = `${dept}_${shift}`;
+    const r       = attDailyRows[key] || {};
+    const master  = attMasters[key]   || { revised: 0 };
+
+    const present    = r.present     || 0;
+    const informed   = r.informed    || 0;
+    const uninformed = r.uninformed  || 0;
+    const dayoff     = r.dayoff      || 0;
+    const longabsent = r.longabsent  || 0;
+    const turnover   = r.turnover    || 0;
+    const recruitment = r.recruitment || 0;
+    const revised    = master.revised || 0;
+
+    const totalAbsent  = informed + uninformed;
+    const onRoll       = present + totalAbsent + dayoff;
+    const excess       = onRoll - revised;
+    const absPct       = onRoll > 0 ? totalAbsent / onRoll : 0;
+    const turnoverPct  = onRoll > 0 ? turnover    / onRoll : 0;
+
+    return {
+      dept, shift, revised,
+      present, informed, uninformed, dayoff,
+      longabsent, turnover, recruitment,
+      totalAbsent, onRoll, excess, absPct, turnoverPct
+    };
+  });
+
+  
+  // Summary totals stored at document level for quick dashboard reads
+  const totals = rows.reduce((acc, r) => {
+    acc.present     += r.present;
+    acc.totalAbsent += r.totalAbsent;
+    acc.onRoll      += r.onRoll;
+    acc.revised     += r.revised;
+    acc.turnover    += r.turnover;
+    acc.recruitment += r.recruitment;
+    acc.longabsent  += r.longabsent;
+    return acc;
+  }, { present:0, totalAbsent:0, onRoll:0, revised:0, turnover:0, recruitment:0, longabsent:0 });
+
+  try {
+    await db.collection('attendance_daily').doc(date).set({
+      date, rows, totals,
+      savedAt: new Date().toISOString()
+    });
+
+    document.getElementById('att-daily-status').textContent = '✔ Saved!';
+    setTimeout(() => document.getElementById('att-daily-status').textContent = '', 3000);
+    toast('Attendance saved!');
+  } catch (e) {
+    toast('Save error: ' + e.message, true);
+  }
+}
+
+// ── exportAttImage ───────────────────────────────────────────
+// Captures the full attendance entry table as a high-res PNG
+// using html2canvas (same library already loaded for the
+// canteen dashboard export). Temporarily removes the overflow
+// clip so the entire wide table is rendered, then restores it.
+async function exportAttImage() {
+  const scrollDiv = document.getElementById('att-entry-table').parentElement;
+
+  const originalOverflow = scrollDiv.style.overflow;
+  const originalWidth    = scrollDiv.style.width;
+
+  scrollDiv.style.overflow = 'visible';
+  scrollDiv.style.width    = scrollDiv.scrollWidth + 'px';
+
+  const canvas = await html2canvas(scrollDiv, {
+    scale: 4,  // 4x resolution for crispness
+    width: scrollDiv.scrollWidth,
+    height: scrollDiv.scrollHeight,
+    windowWidth: scrollDiv.scrollWidth,
+    windowHeight: scrollDiv.scrollHeight
+  });
+
+  scrollDiv.style.overflow = originalOverflow;
+  scrollDiv.style.width    = originalWidth;
+
+  const date = document.getElementById('att-date')?.value || 'attendance';
+
+  const link = document.createElement('a');
+  link.download = `Attendance_${date}.png`;
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+
+  toast('Attendance captured!');
+}
+
+// ── Wire date change listener ────────────────────────────────
+document.getElementById('att-date').addEventListener('change', loadAttDaily);
