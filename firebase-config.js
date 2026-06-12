@@ -11,3 +11,5 @@ firebase.initializeApp(FIREBASE_CONFIG);
 
 const db = firebase.firestore();
 
+//nned to check about firebase api key and other details in firebase-config.js file.
+
