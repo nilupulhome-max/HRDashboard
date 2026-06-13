@@ -272,7 +272,7 @@
      Doc ID     : "{dept}_{shift}"
 ══════════════════════════════════════════════════ -->
 <div class="card">
-  <div class="card-title">👥 Attendance — Carder Master (Revised Required)</div>
+  <div class="card-title">👥 Attendance — Carder Master</div>
 
   <div class="table-scroll">
     <table id="att-master-table">
@@ -280,7 +280,8 @@
         <tr class="th-sub">
           <th class="left" style="padding:8px 10px;min-width:140px;">Department</th>
           <th style="padding:8px 10px;">Shift</th>
-          <th style="padding:8px 10px;min-width:120px;">Total Required Carder (Revised)</th>
+          <th style="padding:8px 10px;min-width:120px;">Total Required Carder</th>
+          <th style="padding:8px 10px;min-width:100px;">Current On Roll</th>
           <th style="padding:8px 10px;width:80px;">Edit</th>
         </tr>
       </thead>
@@ -291,22 +292,26 @@
   </div>
 
   <!-- Inline edit panel -->
-  <div id="att-edit-panel" style="display:none;margin-top:16px;padding-top:16px;border-top:1px solid #eef0f4;">
-    <div style="font-size:.8rem;font-weight:700;color:#1a3a5c;margin-bottom:12px;">
-      ✎ Editing: <span id="att-edit-label"></span>
+<div id="att-edit-panel" style="display:none;margin-top:16px;padding-top:16px;border-top:1px solid #eef0f4;">
+  <div style="font-size:.8rem;font-weight:700;color:#1a3a5c;margin-bottom:12px;">
+    ✎ Editing: <span id="att-edit-label"></span>
+  </div>
+  <div class="form-grid-small">
+    <div class="field">
+      <label>Total Required Carder</label>
+      <input type="number" id="att-e-revised" min="0" value="0"/>
     </div>
-    <div class="form-grid-small">
-      <div class="field">
-        <label>Total Required Carder (Revised)</label>
-        <input type="number" id="att-e-revised" min="0" value="0"/>
-      </div>
-    </div>
-    <div class="form-actions">
-      <button class="btn-save" onclick="saveAttMaster()">💾 Save</button>
-      <button class="btn-clear" onclick="closeAttEdit()">✕ Cancel</button>
-      <span class="save-status" id="att-m-status"></span>
+    <div class="field">
+      <label>Current On Roll</label>
+      <input type="number" id="att-e-onroll" min="0" value="0"/>
     </div>
   </div>
+  <div class="form-actions">
+    <button class="btn-save" onclick="saveAttMaster()">💾 Save</button>
+    <button class="btn-clear" onclick="closeAttEdit()">✕ Cancel</button>
+    <span class="save-status" id="att-m-status"></span>
+  </div>
+</div>
 
 </div>
 
@@ -459,28 +464,27 @@
   <div class="table-scroll">
     <table id="att-entry-table">
       <thead>
-        <tr class="th-group">
-          <th rowspan="2" class="left col-date">Department</th>
-          <th rowspan="2">Shift</th>
-          <th rowspan="2">Revised Required</th>
-          <th colspan="4" class="grp-mc">Attendance</th>
-          <th rowspan="2">Day Off</th>
-          <th rowspan="2">Long Absent (&gt;4)</th>
-          <th rowspan="2">Turnover</th>
-          <th rowspan="2">Recruitment</th>
-          <th colspan="4" class="grp-sujeewa">Calculated</th>
-        </tr>
-        <tr class="th-sub">
-          <th>Present</th>
-          <th>Informed</th>
-          <th>Un-informed</th>
-          <th>Total Absent</th>
-          <th>On Roll</th>
-          <th>Excess/(Short)</th>
-          <th>Absenteeism %</th>
-          <th>Turnover %</th>
-        </tr>
-      </thead>
+  <tr class="th-group">
+    <th rowspan="2" class="left col-date">Department</th>
+    <th rowspan="2">Shift</th>
+    <th rowspan="2" style="min-width:80px;">Revised Required</th>
+    <th rowspan="2" style="min-width:80px;">On Roll</th>
+    <th colspan="4" class="grp-mc">Attendance</th>
+    <th rowspan="2">Day Off</th>
+    <th rowspan="2">Long Absent (&gt;4)</th>
+    <th rowspan="2">Turnover</th>
+    <th rowspan="2">Recruitment</th>
+    <th rowspan="2" style="min-width:80px;">Excess / (Short)</th>
+    <th rowspan="2" style="min-width:90px;border-left:2px solid #b0bec5;">Absenteeism %<br><small style="font-weight:400;font-size:.65rem;">(dept level)</small></th>
+    <th rowspan="2">Turnover %</th>
+  </tr>
+  <tr class="th-sub">
+    <th>Present</th>
+    <th>Informed</th>
+    <th>Un-informed</th>
+    <th>Total Absent</th>
+  </tr>
+</thead>
       <tbody id="att-entry-body">
         <tr><td colspan="15" class="loading-cell">Select a date to load.</td></tr>
       </tbody>
