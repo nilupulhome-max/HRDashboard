@@ -61,28 +61,40 @@
       <!-- Firebase connection status badge (connecting / connected / error) -->
       <div id="db-badge" class="db-badge connecting">⏳ Connecting…</div>
 
+      <div id="user-email" style="font-size:.75rem;opacity:.8;color:#fff;"></div>
+      <!-- Displays the signed-in user's email address after login -->
+
       <!-- Live clock — updated every second by app.js -->
       <div class="hclock" id="clock"></div>
 
       <button class="btn-logout" onclick="logout()">Sign Out</button>
     </div>
 
-    <!-- Tab navigation — switches between Data Entry and Dashboard panels -->
+    <!-- ── TAB NAVIGATION ──────────────────────────────────
+         5 top-level tabs:
+           01. Security Data Entry  — canteen & manpower entry (unchanged)
+           02. HR Master Data       — attendance carder master, cost config, manpower master rates
+           03. HR Data Entry        — daily attendance, daily OT cost, OT daily pre-approval & actual
+           04. IE Data Entry        — OT plan monthly setup
+           05. Dashboards           — manpower summary, OT plan vs actual, canteen/meals/OT dashboard, HR dashboard
+    ──────────────────────────────────────────────────────── -->
     <div class="tabs">
-      <button class="tab active" onclick="switchTab('entry', this)">📝 Data Entry</button>
-      <button class="tab"        onclick="switchTab('dashboard', this)">📊 Dashboard</button>
+      <button class="tab active" onclick="switchTab('security-entry', this)">📝 Security Data Entry</button>
+      <button class="tab"        onclick="switchTab('hr-master',      this)">👥 HR Master Data</button>
+      <button class="tab"        onclick="switchTab('hr-entry',       this)">📋 HR Data Entry</button>
+      <button class="tab"        onclick="switchTab('ie-entry',       this)">⏱ IE Data Entry</button>
+      <button class="tab"        onclick="switchTab('dashboards',     this)">📊 Dashboards</button>
     </div>
   </header>
 
 
   <!-- ════════════════════════════════════════════════════════
-       TAB: DATA ENTRY
-       Contains three independent entry cards:
-         1. Canteen Shift Entry   — supplier / item / qty per shift
-         2. Daily Manpower Entry  — headcount rows per date
-         3. OT Entry              — overtime hours per shift per date
+       TAB 01 — SECURITY DATA ENTRY  (unchanged)
+       Contains:
+         • Canteen Shift Entry   — supplier / item / qty per shift
+         • Daily Manpower Entry  — headcount rows per date
   ════════════════════════════════════════════════════════ -->
-  <div id="tab-entry" class="tab-content active">
+  <div id="tab-security-entry" class="tab-content active">
   <div class="container">
 
 
@@ -172,7 +184,7 @@
          in memory (mpRows[]), then saves them all at once
          to manpower_entries/{date} in Firestore.
          Rates are pre-configured in the Manpower Master
-         Rates card on the Dashboard tab.
+         Rates card on the HR Master Data tab.
     ══════════════════════════════════════════════════ -->
     <div class="card">
       <div class="card-title">👷 Daily Manpower Entry</div>
@@ -250,73 +262,71 @@
 
 
   </div><!-- /container -->
-  </div><!-- /tab-entry -->
+  </div><!-- /tab-security-entry -->
 
 
   <!-- ════════════════════════════════════════════════════════
-       TAB: DASHBOARD
-       Contains six sections:
-         A. Cost Configuration        — per-unit rates for all items + OT rate
-         B. Manpower Master Rates     — Company/Shift/Section rate definitions
-         C. Manpower Summary          — date-range summary of MP entries
-         D. OT Entry                  — daily OT hours input (lives here for space)
-         E. Filter Bar                — date range / shift filter + export / clear
-         F. Main Dashboard Table      — full canteen + MP + OT cost table
+       TAB 02 — HR MASTER DATA
+       Contains:
+         • Attendance — Carder Master
+         • Cost Configuration (Rs) — HR Only
+         • Manpower Master Rates
   ════════════════════════════════════════════════════════ -->
-  <div id="tab-dashboard" class="tab-content">
+  <div id="tab-hr-master" class="tab-content">
   <div class="container-wide">
 
-    <!-- ══════════════════════════════════════════════════
-     ATTENDANCE MASTER — Total Required Carder only
-     Collection : attendance_masters
-     Doc ID     : "{dept}_{shift}"
-══════════════════════════════════════════════════ -->
-<div class="card">
-  <div class="card-title">👥 Attendance — Carder Master</div>
-
-  <div class="table-scroll">
-    <table id="att-master-table">
-      <thead>
-        <tr class="th-sub">
-          <th class="left" style="padding:8px 10px;min-width:140px;">Department</th>
-          <th style="padding:8px 10px;">Shift</th>
-          <th style="padding:8px 10px;min-width:120px;">Total Required Carder</th>
-          <th style="padding:8px 10px;min-width:100px;">Current On Roll</th>
-          <th style="padding:8px 10px;width:80px;">Edit</th>
-        </tr>
-      </thead>
-      <tbody id="att-master-body">
-        <tr><td colspan="4" class="loading-cell">⏳ Loading…</td></tr>
-      </tbody>
-    </table>
-  </div>
-
-  <!-- Inline edit panel -->
-<div id="att-edit-panel" style="display:none;margin-top:16px;padding-top:16px;border-top:1px solid #eef0f4;">
-  <div style="font-size:.8rem;font-weight:700;color:#1a3a5c;margin-bottom:12px;">
-    ✎ Editing: <span id="att-edit-label"></span>
-  </div>
-  <div class="form-grid-small">
-    <div class="field">
-      <label>Total Required Carder</label>
-      <input type="number" id="att-e-revised" min="0" value="0"/>
-    </div>
-    <div class="field">
-      <label>Current On Roll</label>
-      <input type="number" id="att-e-onroll" min="0" value="0"/>
-    </div>
-  </div>
-  <div class="form-actions">
-    <button class="btn-save" onclick="saveAttMaster()">💾 Save</button>
-    <button class="btn-clear" onclick="closeAttEdit()">✕ Cancel</button>
-    <span class="save-status" id="att-m-status"></span>
-  </div>
-</div>
-
-</div>
 
     <!-- ══════════════════════════════════════════════════
-         A. COST CONFIGURATION (HR Only)
+         ATTENDANCE MASTER — Total Required Carder
+         Collection : attendance_masters
+         Doc ID     : "{dept}_{shift}"
+    ══════════════════════════════════════════════════ -->
+    <div class="card">
+      <div class="card-title">👥 Attendance — Carder Master</div>
+
+      <div class="table-scroll">
+        <table id="att-master-table">
+          <thead>
+            <tr class="th-sub">
+              <th class="left" style="padding:8px 10px;min-width:140px;">Department</th>
+              <th style="padding:8px 10px;">Shift</th>
+              <th style="padding:8px 10px;min-width:120px;">Total Required Carder</th>
+              <th style="padding:8px 10px;min-width:100px;">Current On Roll</th>
+              <th style="padding:8px 10px;width:80px;">Edit</th>
+            </tr>
+          </thead>
+          <tbody id="att-master-body">
+            <tr><td colspan="4" class="loading-cell">⏳ Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Inline edit panel -->
+      <div id="att-edit-panel" style="display:none;margin-top:16px;padding-top:16px;border-top:1px solid #eef0f4;">
+        <div style="font-size:.8rem;font-weight:700;color:#1a3a5c;margin-bottom:12px;">
+          ✎ Editing: <span id="att-edit-label"></span>
+        </div>
+        <div class="form-grid-small">
+          <div class="field">
+            <label>Total Required Carder</label>
+            <input type="number" id="att-e-revised" min="0" value="0"/>
+          </div>
+          <div class="field">
+            <label>Current On Roll</label>
+            <input type="number" id="att-e-onroll" min="0" value="0"/>
+          </div>
+        </div>
+        <div class="form-actions">
+          <button class="btn-save"  onclick="saveAttMaster()">💾 Save</button>
+          <button class="btn-clear" onclick="closeAttEdit()">✕ Cancel</button>
+          <span class="save-status" id="att-m-status"></span>
+        </div>
+      </div>
+    </div><!-- /card: attendance carder master -->
+
+
+    <!-- ══════════════════════════════════════════════════
+         COST CONFIGURATION (HR Only)
          Sets per-unit rates stored in Firestore at
          config/costs. Changes here recalculate all
          dashboard totals immediately on next load.
@@ -349,11 +359,11 @@
 
 
     <!-- ══════════════════════════════════════════════════
-         B. MANPOWER MASTER RATES
+         MANPOWER MASTER RATES
          Defines the per-head daily rate for each
          Company / Shift / Section combination.
-         These rates are referenced by the Data Entry
-         manpower form when adding rows.
+         These rates are referenced by the Security Data
+         Entry manpower form when adding rows.
     ══════════════════════════════════════════════════ -->
     <div class="card">
       <div class="card-title">📋 Manpower Master Rates</div>
@@ -408,109 +418,85 @@
     </div><!-- /card: manpower master rates -->
 
 
+  </div><!-- /container-wide -->
+  </div><!-- /tab-hr-master -->
+
+
+  <!-- ════════════════════════════════════════════════════════
+       TAB 03 — HR DATA ENTRY
+       Contains:
+         • Daily Attendance Entry
+         • ⏱ Daily OT Cost  (Formula: Hours × Master OT Rate)
+         • ⏱ OT Daily Entry — Pre Approval & Actual
+  ════════════════════════════════════════════════════════ -->
+  <div id="tab-hr-entry" class="tab-content">
+  <div class="container-wide">
+
+
     <!-- ══════════════════════════════════════════════════
-         C. MANPOWER SUMMARY
-         Read-only date-range view of all saved manpower
-         entries. Click Load to query manpower_entries.
+         DAILY ATTENDANCE ENTRY
+         Collection : attendance_daily
+         Doc ID     : "{date}"  e.g. "2026-06-11"
+         Each doc holds an array of rows, one per dept+shift
     ══════════════════════════════════════════════════ -->
     <div class="card">
-      <div class="card-title">📊 Manpower Summary</div>
+      <div class="card-title">📋 Daily Attendance Entry</div>
 
-      <!-- Date range filter -->
-      <div class="filter-bar" style="margin-bottom:14px;box-shadow:none;padding:0;">
-        <div class="field-inline"><label>From</label><input type="date" id="mp-from"/></div>
-        <div class="field-inline"><label>To</label>  <input type="date" id="mp-to"/></div>
-        <button class="btn-apply" onclick="loadMpSummary()">🔄 Load</button>
+      <div class="form-grid-small" style="margin-bottom:14px;">
+        <div class="field">
+          <label>Date</label>
+          <input type="date" id="att-date"/>
+        </div>
       </div>
 
       <div class="table-scroll">
-        <table>
+        <table id="att-entry-table">
           <thead>
+            <tr class="th-group">
+              <th rowspan="2" class="left col-date">Department</th>
+              <th rowspan="2">Shift</th>
+              <th rowspan="2" style="min-width:80px;">Revised Required</th>
+              <th rowspan="2" style="min-width:80px;">On Roll</th>
+              <th colspan="4" class="grp-mc">Attendance</th>
+              <th rowspan="2">Day Off</th>
+              <th rowspan="2">Long Absent (&gt;4)</th>
+              <th rowspan="2">Turnover</th>
+              <th rowspan="2">Recruitment</th>
+              <th rowspan="2" style="min-width:80px;">Excess / (Short)</th>
+              <th rowspan="2" style="min-width:90px;border-left:2px solid #b0bec5;">Absenteeism %<br><small style="font-weight:400;font-size:.65rem;">(dept level)</small></th>
+              <th rowspan="2">Turnover %</th>
+            </tr>
             <tr class="th-sub">
-              <th class="left" style="padding:8px 10px;">Date</th>
-              <th class="left" style="padding:8px 10px;">Company</th>
-              <th style="padding:8px 10px;">Shift</th>
-              <th style="padding:8px 10px;">Section</th>
-              <th style="padding:8px 10px;">Heads</th>
-              <th style="padding:8px 10px;">Rate</th>
-              <th style="padding:8px 10px;">Cost</th>
+              <th>Present</th>
+              <th>Informed</th>
+              <th>Un-informed</th>
+              <th>Total Absent</th>
             </tr>
           </thead>
-          <!-- Rendered by loadMpSummary() -->
-          <tbody id="mp-summary-body">
-            <tr><td colspan="7" class="loading-cell">Click Load to view.</td></tr>
+          <tbody id="att-entry-body">
+            <tr><td colspan="15" class="loading-cell">Select a date to load.</td></tr>
           </tbody>
-          <tfoot id="mp-summary-foot"></tfoot>
+          <tfoot id="att-entry-foot"></tfoot>
         </table>
       </div>
-    </div><!-- /card: manpower summary -->
+
+      <div class="form-actions" style="margin-top:14px;">
+        <button class="btn-save"   onclick="saveAttDaily()">💾 Save Attendance</button>
+        <!--<button class="btn-export" onclick="exportAttImage()">📷 Export Image</button> -->
+        <span class="save-status" id="att-daily-status"></span>
+      </div>
+    </div><!-- /card: daily attendance entry -->
+
 
     <!-- ══════════════════════════════════════════════════
-     ATTENDANCE DAILY ENTRY
-     Collection : attendance_daily
-     Doc ID     : "{date}"  e.g. "2026-06-11"
-     Each doc holds an array of rows, one per dept+shift
-══════════════════════════════════════════════════ -->
-<div class="card">
-  <div class="card-title">📋 Daily Attendance Entry</div>
-
-  <div class="form-grid-small" style="margin-bottom:14px;">
-    <div class="field">
-      <label>Date</label>
-      <input type="date" id="att-date"/>
-    </div>
-  </div>
-
-  <div class="table-scroll">
-    <table id="att-entry-table">
-      <thead>
-  <tr class="th-group">
-    <th rowspan="2" class="left col-date">Department</th>
-    <th rowspan="2">Shift</th>
-    <th rowspan="2" style="min-width:80px;">Revised Required</th>
-    <th rowspan="2" style="min-width:80px;">On Roll</th>
-    <th colspan="4" class="grp-mc">Attendance</th>
-    <th rowspan="2">Day Off</th>
-    <th rowspan="2">Long Absent (&gt;4)</th>
-    <th rowspan="2">Turnover</th>
-    <th rowspan="2">Recruitment</th>
-    <th rowspan="2" style="min-width:80px;">Excess / (Short)</th>
-    <th rowspan="2" style="min-width:90px;border-left:2px solid #b0bec5;">Absenteeism %<br><small style="font-weight:400;font-size:.65rem;">(dept level)</small></th>
-    <th rowspan="2">Turnover %</th>
-  </tr>
-  <tr class="th-sub">
-    <th>Present</th>
-    <th>Informed</th>
-    <th>Un-informed</th>
-    <th>Total Absent</th>
-  </tr>
-</thead>
-      <tbody id="att-entry-body">
-        <tr><td colspan="15" class="loading-cell">Select a date to load.</td></tr>
-      </tbody>
-      <tfoot id="att-entry-foot"></tfoot>
-    </table>
-  </div>
-
-<div class="form-actions" style="margin-top:14px;">
-  <button class="btn-save" onclick="saveAttDaily()">💾 Save Attendance</button>
-  <button class="btn-export" onclick="exportAttImage()">📷 Export Image</button>  <!-- ← add this -->
-  <span class="save-status" id="att-daily-status"></span>
-</div>
-  
-
-</div>
-
-    <!-- ══════════════════════════════════════════════════
-         D. OT ENTRY (placed in Dashboard tab)
+         DAILY OT COST
+         Formula: Hours × Master OT Rate
          Records daily overtime hours for DAY and NIGHT
          shifts. Stored in ot_entries/{date}.
-         Cost formula: hours × Master OT Rate
-         The rate is shown in the banner below the title.
     ══════════════════════════════════════════════════ -->
     <div class="card">
       <div class="card-title">
-        ⏱ Daily OT Entry
+        ⏱ Daily OT Cost
         <!-- Inline formula reminder for the user -->
         <span class="ot-formula-note">Formula: Hours × Master OT Rate</span>
       </div>
@@ -518,7 +504,7 @@
       <!-- Live display of the current Master OT Rate from COSTS -->
       <div class="ot-rate-banner">
         Master OT Rate: <strong id="ot-rate-display">Rs –</strong>
-        &nbsp;·&nbsp; Change in Dashboard → Cost Configuration
+        &nbsp;·&nbsp; Change in HR Master Data → Cost Configuration
       </div>
 
       <div class="form-grid-small">
@@ -562,127 +548,454 @@
         <button class="btn-save" onclick="saveOT()">💾 Save OT</button>
         <span class="save-status" id="ot-status"></span>
       </div>
-    </div><!-- /card: OT entry -->
+    </div><!-- /card: daily OT cost -->
 
 
     <!-- ══════════════════════════════════════════════════
-         E. FILTER BAR
-         Controls the date range and shift filter applied
-         to the main dashboard table below.
-         Also houses Export (CSV, Image) and Clear actions.
+         OT DAILY ENTRY — PRE APPROVAL & ACTUAL
+         Collection : ot_daily
+         Document ID: "YYYY-MM-DD"
     ══════════════════════════════════════════════════ -->
-    <div class="filter-bar">
-      <div class="field-inline"><label>From</label><input type="date" id="f-from"/></div>
-      <div class="field-inline"><label>To</label>  <input type="date" id="f-to"/></div>
-      <div class="field-inline">
-        <label>Shift</label>
-        <select id="f-shift">
-          <option value="ALL">All Shifts</option>
-          <option value="DAY">DAY</option>
-          <option value="NIGHT">NIGHT</option>
-        </select>
+    <div class="card">
+      <div class="card-title">⏱ OT Daily Entry — Pre Approval &amp; Actual</div>
+
+      <div class="form-grid-small" style="margin-bottom:14px;">
+        <div class="field">
+          <label>Date</label>
+          <input type="date" id="otd-date"/>
+        </div>
+        <div class="field" style="justify-content:flex-end;">
+          <label>&nbsp;</label>
+          <button class="btn-save" onclick="loadOTDaily()">📂 Load</button>
+        </div>
       </div>
 
-      <!-- Queries Firestore with the current filter and rebuilds the table -->
-      <button class="btn-apply"  onclick="loadDashboard()">🔄 Refresh Dashboard</button>
+      <div class="table-scroll">
+        <table id="otd-entry-table">
+          <thead>
+            <tr class="th-sub">
+              <th class="left" style="padding:8px 10px;min-width:130px;">Department</th>
+              <th style="padding:8px 10px;min-width:80px;">Planned (from OT Plan)</th>
+              <th style="padding:8px 10px;min-width:90px;">Pre Approval OT Hrs</th>
+              <th style="padding:8px 10px;min-width:90px;">Actual OT Hrs</th>
+              <th style="padding:8px 10px;min-width:80px;">Difference</th>
+            </tr>
+          </thead>
+          <tbody id="otd-entry-body">
+            <tr><td colspan="5" class="loading-cell">Select a date and click Load.</td></tr>
+          </tbody>
+          <tfoot id="otd-entry-foot"></tfoot>
+        </table>
+      </div>
 
-      <!-- Downloads the current dashData as a .csv file -->
-      <button class="btn-export" onclick="exportCSV()">⬇ Export CSV</button>
-
-      <!-- Screenshots the full dashboard table as a high-res PNG -->
-      <button class="btn-export" onclick="exportImage()">📷 Export Image</button>
-
-      <!-- Permanently deletes all records in the selected date range
-           across records, ot_entries, and manpower_entries collections -->
-      <button class="btn-delete" id="clearBtn" onclick="clearRangeRecords()">🗑 Clear Records</button>
-    </div><!-- /filter-bar -->
-
-
-    <!-- ══════════════════════════════════════════════════
-         F. MAIN DASHBOARD TABLE
-         Rendered by renderTable() after loadDashboard().
-         24 columns across 3 header rows:
-           Row 1: Supplier group headers (colspans)
-           Row 2: Sub-column labels
-           Row 3: Rate cells for MC Tea columns
-
-         Column groups:
-           Date | Shift |
-           MC Caters (Tea×2, Sub, Biscuit×3) |
-           SAM Bake House (Snack×2) |
-           Sujeewa (Breakfast×2) |
-           Nilu (Lunch, Dinner, Total) |
-           Walgama Hotel (Lunch, Dinner, Total) |
-           Manpower (Heads, Cost) |
-           OT (Hours, Cost) |
-           Daily Total
-    ══════════════════════════════════════════════════ -->
-    <div class="table-scroll">
-      <table id="dashTable">
-        <thead>
-
-          <!-- Row 1: Supplier group headers -->
-          <tr class="th-group">
-            <th rowspan="3" class="col-date">Date</th>
-            <th rowspan="3" class="col-shift">Shift</th>
-            <!-- MC Caters: Tea (×2 qty/cost each), Sub-total, Biscuits (type/qty/total) -->
-            <th colspan="8" class="grp-mc">Canteen (MC Caters)</th>
-            <th colspan="2" class="grp-sam">Snack (SAM Bake House)</th>
-            <th colspan="2" class="grp-sujeewa">Sujeewa</th>
-            <th colspan="3" class="grp-nilu">Nilu</th>
-            <th colspan="3" class="grp-walgama">Walgama Hotel</th>
-            <th colspan="2" class="grp-mp">Manpower</th>
-            <th colspan="2" class="grp-ot">OT</th>
-            <th rowspan="3" class="grp-total col-total">Daily Total<br>(Rs)</th>
-          </tr>
-
-          <!-- Row 2: Column sub-headers -->
-          <tr class="th-sub">
-            <th colspan="2">Tea (Milk)</th>
-            <th colspan="2">Plain Tea</th>
-            <th rowspan="2" class="subtotal-col">Sub Total</th>
-            <th rowspan="2">Biscuit Code</th>
-            <th rowspan="2">Qty</th>
-            <th rowspan="2">Total</th>
-            <th rowspan="2">Snack Qty</th>
-            <th rowspan="2">Total</th>
-            <th rowspan="2">Breakfast</th>
-            <th rowspan="2">Total</th>
-            <th rowspan="2">Lunch</th>
-            <th rowspan="2">Dinner</th>
-            <th rowspan="2">Total</th>
-            <th rowspan="2">Lunch</th>
-            <th rowspan="2">Dinner</th>
-            <th rowspan="2">Total</th>
-            <th rowspan="2">Heads</th>
-            <th rowspan="2">Cost</th>
-            <th rowspan="2">Hours</th>
-            <th rowspan="2">Cost</th>
-          </tr>
-
-          <!-- Row 3: Rate labels for tea columns (updated by updateRateHeaders()) -->
-          <tr class="th-rate">
-            <th>Qty</th>
-            <th class="rate-cell" id="rh-milkTea">–</th>
-            <th>Qty</th>
-            <th class="rate-cell" id="rh-plainTea">–</th>
-          </tr>
-
-        </thead>
-
-        <!-- Data rows injected by renderTable() -->
-        <tbody id="dashBody">
-          <tr><td colspan="24" class="loading-cell">Switch to this tab to load data.</td></tr>
-        </tbody>
-
-        <!-- Grand total row injected by renderTable() -->
-        <tfoot id="dashFoot"></tfoot>
-      </table>
-    </div><!-- /table-scroll -->
+      <div class="form-actions" style="margin-top:14px;">
+        <button class="btn-save" onclick="saveOTDaily()">💾 Save</button>
+        <span class="save-status" id="otd-status"></span>
+      </div>
+    </div><!-- /card: OT daily entry -->
 
 
   </div><!-- /container-wide -->
-  </div><!-- /tab-dashboard -->
+  </div><!-- /tab-hr-entry -->
+
+
+  <!-- ════════════════════════════════════════════════════════
+       TAB 04 — IE DATA ENTRY
+       Contains:
+         • ⏱ OT Plan — Monthly Setup
+  ════════════════════════════════════════════════════════ -->
+  <div id="tab-ie-entry" class="tab-content">
+  <div class="container-wide">
+
+
+    <!-- ══════════════════════════════════════════════════
+         OT PLAN — MONTHLY MASTER
+         Collection : ot_plans
+         Document ID: "YYYY-MM"  e.g. "2026-05"
+    ══════════════════════════════════════════════════ -->
+    <div class="card">
+      <div class="card-title">⏱ OT Plan — Monthly Setup</div>
+
+      <!-- Month selector + actions -->
+      <div class="form-grid-small" style="margin-bottom:14px;">
+        <div class="field">
+          <label>Month</label>
+          <input type="month" id="otp-month"/>
+        </div>
+        <div class="field" style="justify-content:flex-end;">
+          <label>&nbsp;</label>
+          <button class="btn-save" onclick="loadOTPlan()">📂 Load / New</button>
+        </div>
+      </div>
+
+      <!-- Plan setup table — shown after month is loaded -->
+      <div id="otp-setup" style="display:none;">
+
+        <!-- Special holiday override bar -->
+        <div style="background:#fff8e1;border:1px solid #f0a500;border-radius:6px;
+                    padding:10px 14px;margin-bottom:14px;font-size:.82rem;">
+          <strong>🗓 Special Holiday Override</strong> — set a date to 0 for all depts,
+          or edit individual dept cells in the table below.
+          <div style="display:flex;gap:10px;align-items:center;margin-top:8px;flex-wrap:wrap;">
+            <div class="field" style="min-width:150px;">
+              <label>Date</label>
+              <input type="date" id="otp-holiday-date"/>
+            </div>
+            <div style="align-self:flex-end;">
+              <button class="btn-clear" onclick="addOTPHoliday()">
+                Set as Holiday (all depts → 0)
+              </button>
+            </div>
+            <span class="save-status" id="otp-holiday-status"></span>
+          </div>
+        </div>
+
+        <!-- Scrollable plan table -->
+        <div class="table-scroll" id="otp-table-wrap">
+          <table id="otp-table">
+            <thead id="otp-thead"></thead>
+            <tbody id="otp-tbody"></tbody>
+            <tfoot id="otp-tfoot"></tfoot>
+          </table>
+        </div>
+
+        <div class="form-actions" style="margin-top:14px;">
+          <button class="btn-save"   onclick="saveOTPlan()">💾 Save OT Plan</button>
+          <button class="btn-export" onclick="exportOTPImage()">📷 Capture</button>
+          <span class="save-status" id="otp-status"></span>
+        </div>
+      </div>
+
+    </div><!-- /card: OT plan monthly setup -->
+
+
+  </div><!-- /container-wide -->
+  </div><!-- /tab-ie-entry -->
+
+
+  <!-- ════════════════════════════════════════════════════════
+       TAB 05 — DASHBOARDS
+       Contains:
+         • Manpower Summary
+         • 📊 OT Plan vs Actual Dashboard
+         • Canteen / Meals / Tea / Manpower & OT Cost Dashboard
+         • HR Dashboard — "as per Date"
+  ════════════════════════════════════════════════════════ -->
+  <div id="tab-dashboards" class="tab-content">
+  <div class="container-wide">
+
+
+    <!-- ══════════════════════════════════════════════════
+         MANPOWER SUMMARY
+         Read-only date-range view of all saved manpower
+         entries. Click Load to query manpower_entries.
+    ══════════════════════════════════════════════════ -->
+    <div class="card">
+      <div class="card-title"> 🏢 Manpower Summary</div>
+
+      <!-- Date range filter -->
+      <div class="filter-bar" style="margin-bottom:14px;box-shadow:none;padding:0;">
+        <div class="field-inline"><label>From</label><input type="date" id="mp-from"/></div>
+        <div class="field-inline"><label>To</label>  <input type="date" id="mp-to"/></div>
+        <button class="btn-apply" onclick="loadMpSummary()">🔄 Load</button>
+      </div>
+
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr class="th-sub">
+              <th class="left" style="padding:8px 10px;">Date</th>
+              <th class="left" style="padding:8px 10px;">Company</th>
+              <th style="padding:8px 10px;">Shift</th>
+              <th style="padding:8px 10px;">Section</th>
+              <th style="padding:8px 10px;">Heads</th>
+              <th style="padding:8px 10px;">Rate</th>
+              <th style="padding:8px 10px;">Cost</th>
+            </tr>
+          </thead>
+          <!-- Rendered by loadMpSummary() -->
+          <tbody id="mp-summary-body">
+            <tr><td colspan="7" class="loading-cell">Click Load to view.</td></tr>
+          </tbody>
+          <tfoot id="mp-summary-foot"></tfoot>
+        </table>
+      </div>
+    </div><!-- /card: manpower summary -->
+
+
+    <!-- ══════════════════════════════════════════════════
+         OT PLAN VS ACTUAL DASHBOARD
+         Dashboard reads : ot_plans/{YYYY-MM} +
+                           ot_daily docs for month
+    ══════════════════════════════════════════════════ -->
+    <div class="card">
+      <div class="card-title">⏱️ OT Plan vs Actual Dashboard</div>
+
+      <div class="filter-bar" style="margin-bottom:14px;box-shadow:none;padding:0;">
+        <div class="field-inline">
+          <label>Month</label>
+          <input type="month" id="otd-dash-month"/>
+        </div>
+        <button class="btn-apply"  onclick="loadOTDashboard()">🔄 Load</button>
+        <button class="btn-export" onclick="exportOTDashImage()">📷 Capture</button>
+      </div>
+
+      <!-- As-at date label -->
+      <div id="otd-asat-label" style="font-size:.82rem;color:#555;margin-bottom:10px;"></div>
+
+      <div class="table-scroll" id="otd-dash-wrap">
+        <table id="otd-dash-table">
+          <caption style="text-align:left;padding:10px 10px 8px;
+                            border-bottom:2px solid #1a3a5c;margin-bottom:4px;
+                            caption-side:top;background:#fff;">
+              <div style="font-size:.95rem;font-weight:700;color:#1a3a5c;">
+                ⏱️ OT Plan vs Actual Dashboard
+              </div>
+              <div id="otd-month-label" style="font-size:.78rem;color:#555;margin-top:3px;"></div>
+            </caption>
+          
+          <thead>
+            <tr class="th-group">
+              <th rowspan="2" class="left" style="min-width:130px;padding:7px 10px;">
+                Department
+              </th>
+              <th rowspan="2" style="padding:7px 8px;min-width:90px;background:#1a3a5c;color:#fff;">
+                Target OT Hrs (Budget)
+              </th>
+              <th rowspan="2" style="padding:7px 8px;min-width:90px;background:#155a35;color:#fff;">
+                Assigned Target OT Hrs (to Date)
+              </th>
+              <th rowspan="2" style="padding:7px 8px;min-width:85px;">
+                Pre Approval OT
+              </th>
+              <th rowspan="2" style="padding:7px 8px;min-width:85px;">
+                Actual OT Hrs
+              </th>
+              <th rowspan="2" style="padding:7px 8px;min-width:75px;">
+                Difference
+              </th>
+              <th rowspan="2" style="padding:7px 8px;min-width:75px;">
+                No of Employees (Revised)
+              </th>
+              <th colspan="2" class="grp-mc" style="padding:7px 8px;">
+                Avg OT Hrs / Head
+              </th>
+              <th rowspan="2" style="padding:7px 8px;min-width:90px;background:#6d5504;color:#fff;">
+                Monthly Budgeted OT Hrs / Head
+              </th>
+            </tr>
+            <tr class="th-sub">
+              <th style="padding:6px 8px;">As Per Initial Allocation</th>
+              <th style="padding:6px 8px;">Actual</th>
+            </tr>
+          </thead>
+          <tbody id="otd-dash-body">
+            <tr><td colspan="10" class="loading-cell">Select a month and click Load.</td></tr>
+          </tbody>
+          <tfoot id="otd-dash-foot"></tfoot>
+        </table>
+      </div>
+    </div><!-- /card: OT plan vs actual dashboard -->
+
+
+    <!-- ══════════════════════════════════════════════════
+         CANTEEN / MEALS / TEA / MANPOWER & OT COST DASHBOARD
+         Filter bar controls the date range and shift filter
+         applied to the main dashboard table.
+         Also houses Export (CSV, Image) and Clear actions.
+    ══════════════════════════════════════════════════ -->
+    <div class="card">
+      <div class="card-title">📊 Canteen, Meals, Tea &amp; OT Cost Dashboard</div>
+
+      <div class="filter-bar">
+        <div class="field-inline"><label>From</label><input type="date" id="f-from"/></div>
+        <div class="field-inline"><label>To</label>  <input type="date" id="f-to"/></div>
+        <div class="field-inline">
+          <label>Shift</label>
+          <select id="f-shift">
+            <option value="ALL">All Shifts</option>
+            <option value="DAY">DAY</option>
+            <option value="NIGHT">NIGHT</option>
+          </select>
+        </div>
+
+        <!-- Queries Firestore with the current filter and rebuilds the table -->
+        <button class="btn-apply"  onclick="loadDashboard()">🔄 Refresh Dashboard</button>
+
+        <!-- Downloads the current dashData as a .csv file -->
+        <button class="btn-export" onclick="exportCSV()">⬇ Export CSV</button>
+
+        <!-- Screenshots the full dashboard table as a high-res PNG -->
+        <button class="btn-export" onclick="exportImage()">📷 Export Image</button>
+
+        <!-- Permanently deletes all records in the selected date range
+             across records, ot_entries, and manpower_entries collections -->
+        <button class="btn-delete" id="clearBtn" onclick="clearRangeRecords()">🗑 Clear Records</button>
+      </div><!-- /filter-bar -->
+
+
+      <!-- ══════════════════════════════════════════════════
+           MAIN DASHBOARD TABLE
+           Rendered by renderTable() after loadDashboard().
+           24 columns across 3 header rows:
+             Row 1: Supplier group headers (colspans)
+             Row 2: Sub-column labels
+             Row 3: Rate cells for MC Tea columns
+
+           Column groups:
+             Date | Shift |
+             MC Caters (Tea×2, Sub, Biscuit×3) |
+             SAM Bake House (Snack×2) |
+             Sujeewa (Breakfast×2) |
+             Nilu (Lunch, Dinner, Total) |
+             Walgama Hotel (Lunch, Dinner, Total) |
+             Manpower (Heads, Cost) |
+             OT (Hours, Cost) |
+             Daily Total
+      ══════════════════════════════════════════════════ -->
+      <div class="table-scroll">
+        <table id="dashTable">
+            <caption style="text-align:left;padding:10px 10px 8px;
+                  border-bottom:2px solid #1a3a5c;margin-bottom:4px;
+                  caption-side:top;background:#fff;">
+    <div style="font-size:.95rem;font-weight:700;color:#1a3a5c;">
+       📊 Canteen, Meals, Tea & OT Cost Dashboard
+    </div>
+    <div id="dash-date-label" style="font-size:.78rem;color:#555;margin-top:3px;"></div>
+  </caption>
+          <thead>
+
+            <!-- Row 1: Supplier group headers -->
+            <tr class="th-group">
+              <th rowspan="3" class="col-date">Date</th>
+              <th rowspan="3" class="col-shift">Shift</th>
+              <!-- MC Caters: Tea (×2 qty/cost each), Sub-total, Biscuits (type/qty/total) -->
+              <th colspan="8" class="grp-mc">Canteen (MC Caters)</th>
+              <th colspan="2" class="grp-sam">Snack (SAM Bake House)</th>
+              <th colspan="2" class="grp-sujeewa">Sujeewa</th>
+              <th colspan="3" class="grp-nilu">Nilu</th>
+              <th colspan="3" class="grp-walgama">Walgama Hotel</th>
+              <th colspan="2" class="grp-mp">Manpower</th>
+              <th colspan="2" class="grp-ot">OT</th>
+              <th rowspan="3" class="grp-total col-total">Daily Total<br>(Rs)</th>
+            </tr>
+
+            <!-- Row 2: Column sub-headers -->
+            <tr class="th-sub">
+              <th colspan="2">Tea (Milk)</th>
+              <th colspan="2">Plain Tea</th>
+              <th rowspan="2" class="subtotal-col">Sub Total</th>
+              <th rowspan="2">Biscuit Code</th>
+              <th rowspan="2">Qty</th>
+              <th rowspan="2">Total</th>
+              <th rowspan="2">Snack Qty</th>
+              <th rowspan="2">Total</th>
+              <th rowspan="2">Breakfast</th>
+              <th rowspan="2">Total</th>
+              <th rowspan="2">Lunch</th>
+              <th rowspan="2">Dinner</th>
+              <th rowspan="2">Total</th>
+              <th rowspan="2">Lunch</th>
+              <th rowspan="2">Dinner</th>
+              <th rowspan="2">Total</th>
+              <th rowspan="2">Heads</th>
+              <th rowspan="2">Cost</th>
+              <th rowspan="2">Hours</th>
+              <th rowspan="2">Cost</th>
+            </tr>
+
+            <!-- Row 3: Rate labels for tea columns (updated by updateRateHeaders()) -->
+            <tr class="th-rate">
+              <th>Qty</th>
+              <th class="rate-cell" id="rh-milkTea">–</th>
+              <th>Qty</th>
+              <th class="rate-cell" id="rh-plainTea">–</th>
+            </tr>
+
+          </thead>
+
+          <!-- Data rows injected by renderTable() -->
+          <tbody id="dashBody">
+            <tr><td colspan="24" class="loading-cell">Switch to this tab to load data.</td></tr>
+          </tbody>
+
+          <!-- Grand total row injected by renderTable() -->
+          <tfoot id="dashFoot"></tfoot>
+        </table>
+      </div><!-- /table-scroll -->
+
+    </div><!-- /card: canteen/meals/OT dashboard -->
+
+
+   <!-- ══════════════════════════════════════════════════
+     HR ATTENDANCE DASHBOARD — AS PER DATE
+     Read-only mirror of Daily Attendance Entry table.
+     Reads: attendance_daily/{date}
+══════════════════════════════════════════════════ -->
+<div class="card">
+  <div class="card-title">👥 HR Dashboard — Daily Attendance</div>
+
+  <div class="filter-bar" style="margin-bottom:14px;box-shadow:none;padding:0;">
+    <div class="field-inline">
+      <label>Date</label>
+      <input type="date" id="hrd-date"/>
+    </div>
+    <button class="btn-apply"  onclick="loadHRDashboard()">🔄 Load</button>
+    <button class="btn-export" onclick="exportHRDashImage()">📷 Capture</button>
+  </div>
+
+  <!-- Single scroll wrapper — title + date + table all inside -->
+  <div class="table-scroll" id="hrd-wrap">
+    <table id="hrd-table">
+
+      <!-- Caption acts as the heading row inside the table
+           so it is always captured with the table -->
+      <caption style="text-align:left;padding:10px 10px 8px;
+                      border-bottom:2px solid #1a3a5c;margin-bottom:4px;
+                      caption-side:top;background:#fff;">
+        <div style="font-size:.95rem;font-weight:700;color:#1a3a5c;">
+          👥 Daily Attendance
+        </div>
+        <div id="hrd-asat" style="font-size:.78rem;color:#555;margin-top:3px;"></div>
+      </caption>
+
+      <thead>
+        <tr class="th-group">
+          <th rowspan="2" class="left col-date">Department</th>
+          <th rowspan="2">Shift</th>
+          <th rowspan="2" style="min-width:80px;">Revised Required</th>
+          <th rowspan="2" style="min-width:80px;">On Roll</th>
+          <th colspan="4" class="grp-mc">Attendance</th>
+          <th rowspan="2">Day Off</th>
+          <th rowspan="2">Long Absent (&gt;4)</th>
+          <th rowspan="2">Turnover</th>
+          <th rowspan="2">Recruitment</th>
+          <th rowspan="2" style="min-width:80px;">Excess / (Short)</th>
+          <th rowspan="2" style="min-width:90px;border-left:2px solid #b0bec5;">
+            Absenteeism %<br>
+            <small style="font-weight:400;font-size:.65rem;">(dept level)</small>
+          </th>
+          <th rowspan="2">Turnover %</th>
+        </tr>
+        <tr class="th-sub">
+          <th>Present</th>
+          <th>Informed</th>
+          <th>Un-informed</th>
+          <th>Total Absent</th>
+        </tr>
+      </thead>
+      <tbody id="hrd-body">
+        <tr><td colspan="15" class="loading-cell">
+          Select a date and click Load.
+        </td></tr>
+      </tbody>
+      <tfoot id="hrd-foot"></tfoot>
+    </table>
+  </div>
+</div>
+
+  </div><!-- /container-wide -->
+  </div><!-- /tab-dashboards -->
 
 
 </div><!-- /appContent -->

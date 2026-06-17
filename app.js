@@ -59,16 +59,7 @@ async function login() {
 function logout() {
   auth.signOut()
     .then(() => {
-      // Show login, hide app
-      document.getElementById('loginScreen').style.display = 'flex';
-      document.getElementById('appContent').style.display  = 'none';
-      document.getElementById('loginMsg').textContent      = '';
-
-      // Reset tab state — always land on Data Entry after logout
-      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-      document.querySelectorAll('.tab').forEach(el       => el.classList.remove('active'));
-      document.getElementById('tab-entry').classList.add('active');
-      document.querySelector('.tab').classList.add('active');
+      window.location.reload();   // cleanest reset — reloads to login screen
     })
     .catch(e => toast('Logout error: ' + e.message, true));
 }
@@ -80,28 +71,66 @@ function logout() {
 // On logout → show login screen.
 auth.onAuthStateChanged(user => {
   if (user) {
-    // User is signed in — reveal the main app
+    // Show app
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('appContent').style.display  = 'block';
 
-    // Update the Firebase connection status badge in the header
+    // Show logged-in user email in header
+    // Show only the name part before the @ symbol
+      document.getElementById('user-email').textContent =
+  '👤 ' + user.email.split('@')[0];
+
+    // Update Firebase badge
     const badge = document.getElementById('db-badge');
     badge.className   = 'db-badge connected';
     badge.textContent = '🟢 Connected';
 
-    // Load all persistent data in sequence.
-    // Dashboard intentionally loads only when that tab is clicked.
-    loadCosts().then(() => {
-      loadMpRates();   // populates the Manpower Rates table & dropdowns
-      loadMpEntry();   // loads today's manpower entry rows
-      loadOTEntry();   // loads today's OT hours
-      loadAttMasters(); //load attendence masters
-      initAttDailyDate(); /// sets today's date and loads attendance
+    // Load all data then auto-trigger all dashboards for today
+    loadCosts().then(async () => {
+
+      // ── Masters ──────────────────────────────────────────
+      await loadMpRates();
+      await loadAttMasters();
+
+      // ── Daily entries (today) ────────────────────────────
+      loadMpEntry();
+      loadOTEntry();
+      initAttDailyDate();   // sets today + loads attendance entry
+      initOTPlan();         // sets current month in OT plan picker
+      initOTDaily();        // sets today in OT daily picker
+
+      // ── Auto-load all dashboards for today ───────────────
+      const now = new Date();
+      const pad = n => String(n).padStart(2, '0');
+      const today = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
+      const month = `${now.getFullYear()}-${pad(now.getMonth()+1)}`;
+
+      // Canteen dashboard — uses f-from / f-to already set by initDates()
+      loadDashboard();
+
+      // Manpower summary
+      document.getElementById('mp-from').value = `${now.getFullYear()}-${pad(now.getMonth()+1)}-01`;
+      document.getElementById('mp-to').value   = today;
+      loadMpSummary();
+
+      // HR Attendance dashboard
+      document.getElementById('hrd-date').value = today;
+      loadHRDashboard();
+
+      // OT Plan vs Actual dashboard
+      document.getElementById('otd-dash-month').value = month;
+      loadOTDashboard();
+
+      // OT daily entry — load today
+      document.getElementById('otd-date').value = today;
+      loadOTDaily();
     });
+
   } else {
-    // User is signed out — show login screen
+    // Signed out
     document.getElementById('loginScreen').style.display = 'flex';
     document.getElementById('appContent').style.display  = 'none';
+    document.getElementById('user-email').textContent    = '';
   }
 });
 
@@ -569,6 +598,9 @@ async function loadDashboard() {
       });
     });
 
+    document.getElementById('dash-date-label').textContent =
+  `Period: ${from}  to  ${to}  |  Shift: ${shift}`;
+
     // ── Attach MP and OT data to each row ────────────────────
     Object.values(grouped).forEach(row => {
       if (mpMap[row.date]) row.mpEntry = mpMap[row.date];
@@ -900,30 +932,31 @@ function exportCSV() {
 // container so the entire table is rendered, then restores it.
 async function exportImage() {
   const scrollDiv = document.getElementById('dashTable').parentElement;
+  const table     = document.getElementById('dashTable');
 
-  // Temporarily expand the container so html2canvas can see the full table
-  const originalOverflow = scrollDiv.style.overflow;
-  const originalWidth    = scrollDiv.style.width;
+  const origOv = scrollDiv.style.overflow;
+  const origW  = scrollDiv.style.width;
   scrollDiv.style.overflow = 'visible';
-  scrollDiv.style.width    = scrollDiv.scrollWidth + 'px';
+  scrollDiv.style.width    = table.scrollWidth + 'px';
+
+  await new Promise(r => setTimeout(r, 80));
 
   const canvas = await html2canvas(scrollDiv, {
-    scale:        3,                        // 3× for print-quality resolution
-    width:        scrollDiv.scrollWidth,
-    height:       scrollDiv.scrollHeight,
-    windowWidth:  scrollDiv.scrollWidth,
-    windowHeight: scrollDiv.scrollHeight
+    scale:      3,
+    useCORS:    true,
+    allowTaint: true,
+    scrollX:    0,
+    scrollY:    -window.scrollY
   });
 
-  // Restore original styles
-  scrollDiv.style.overflow = originalOverflow;
-  scrollDiv.style.width    = originalWidth;
+  scrollDiv.style.overflow = origOv;
+  scrollDiv.style.width    = origW;
 
-  // Trigger PNG download
   const link    = document.createElement('a');
-  link.download = 'HR-Canteen-Full-Dashboard.png';
+  link.download = `Canteen_Dashboard_${document.getElementById('f-from').value}_to_${document.getElementById('f-to').value}.png`;
   link.href     = canvas.toDataURL('image/png');
   link.click();
+  toast('Captured!');
 }
 
 
@@ -1887,32 +1920,1250 @@ async function saveAttDaily() {
 }
 
 // ── exportAttImage ───────────────────────────────────────────
+// Captures the full attendance entry table as a high-res PNG
+// using html2canvas (same library already loaded for the
+// canteen dashboard export). Temporarily removes the overflow
+// clip so the entire wide table is rendered, then restores it.
 async function exportAttImage() {
   const date      = document.getElementById('att-date').value || 'attendance';
   const scrollDiv = document.getElementById('att-entry-table').parentElement;
+
+  // Expand container so html2canvas sees the full table width
   const origOverflow = scrollDiv.style.overflow;
   const origWidth    = scrollDiv.style.width;
   scrollDiv.style.overflow = 'visible';
   scrollDiv.style.width    = scrollDiv.scrollWidth + 'px';
 
   const canvas = await html2canvas(scrollDiv, {
-    scale: 3,
+    scale:        3,                        // 3× for print-quality resolution
     width:        scrollDiv.scrollWidth,
     height:       scrollDiv.scrollHeight,
     windowWidth:  scrollDiv.scrollWidth,
     windowHeight: scrollDiv.scrollHeight,
-    backgroundColor: '#ffffff'
+    backgroundColor: '#ffffff'             // force white background
   });
 
+  // Restore original styles
   scrollDiv.style.overflow = origOverflow;
   scrollDiv.style.width    = origWidth;
 
+  // Trigger PNG download
   const link    = document.createElement('a');
   link.download = `Attendance_${date}.png`;
+  link.href     = canvas.toDataURL('image/png');
+  link.click();
+
+  toast('Attendance captured!');
+}
+// ── Wire date change ─────────────────────────────────────────
+document.getElementById('att-date').addEventListener('change', loadAttDaily);
+
+// ════════════════════════════════════════════════════════════
+//  OT PLAN — MONTHLY MASTER
+//  Firestore collection : ot_plans
+//  Document ID          : "YYYY-MM"  e.g. "2026-05"
+//
+//  Structure per document:
+//    month   : "2026-05"
+//    depts   : [ { dept, heads, weekdayHrs, saturdayHrs,
+//                  overrides: { "2026-05-10": hrs, ... } } ]
+//    holidays: [ "2026-05-01", ... ]  ← all-dept zero days
+//
+//  Calculated on render (not stored):
+//    monthlyTotal  = sum of all day columns
+//    otToDate      = sum from day 1 → today
+//    hrsPerHead    = monthlyTotal / heads
+//    each day cell = weekdayHrs | saturdayHrs | 0 (Sun/holiday)
+//                    overridden if dept has an override for that date
+// ════════════════════════════════════════════════════════════
+
+// Fixed dept list — same across all modules
+const OT_DEPTS = [
+  'Stores', 'Quality', 'Special Section', 'Washing',
+  'Sub Chemical', 'Sample', 'Maintenance', 'R & D',
+  'ERP', 'Marketing', 'HR'
+];
+
+// In-memory plan for the currently loaded month
+let otPlan = null;   // full document data
+let otPlanMonth = '';  // "YYYY-MM"
+
+// ── initOTPlan ───────────────────────────────────────────────
+// Sets the month picker to current month on page load.
+function initOTPlan() {
+  const now = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  document.getElementById('otp-month').value =
+    `${now.getFullYear()}-${pad(now.getMonth() + 1)}`;
+}
+
+// ── loadOTPlan ───────────────────────────────────────────────
+// Loads existing plan for selected month, or creates a blank
+// new plan if none exists. Then renders the full grid.
+async function loadOTPlan() {
+  const month = document.getElementById('otp-month').value;
+  if (!month) { toast('Select a month', true); return; }
+
+  otPlanMonth = month;
+
+  try {
+    const doc = await db.collection('ot_plans').doc(month).get();
+
+    if (doc.exists) {
+      // Load existing plan
+      otPlan = doc.data();
+    } else {
+      // Build blank plan for this month
+      otPlan = {
+        month,
+        holidays: [],
+        depts: OT_DEPTS.map(dept => ({
+          dept,
+          heads:       0,
+          weekdayHrs:  0,
+          saturdayHrs: 0,
+          overrides:   {}   // { "YYYY-MM-DD": hrs }
+        }))
+      };
+    }
+
+    document.getElementById('otp-setup').style.display = '';
+    renderOTPlan();
+  } catch (e) {
+    toast('Error loading OT plan: ' + e.message, true);
+  }
+}
+
+// ── getDaysInMonth ───────────────────────────────────────────
+// Returns array of Date objects for every day in "YYYY-MM".
+function getDaysInMonth(month) {
+  const [y, m] = month.split('-').map(Number);
+  const days   = [];
+  const total  = new Date(y, m, 0).getDate();   // last day of month
+  for (let d = 1; d <= total; d++) {
+    days.push(new Date(y, m - 1, d));
+  }
+  return days;
+}
+
+// ── dayType ──────────────────────────────────────────────────
+// Returns "sun" | "sat" | "weekday" for a given Date.
+function dayType(date) {
+  const dow = date.getDay();   // 0=Sun, 6=Sat
+  if (dow === 0) return 'sun';
+  if (dow === 6) return 'sat';
+  return 'weekday';
+}
+
+// ── dateKey ──────────────────────────────────────────────────
+// Returns "YYYY-MM-DD" string for a Date object.
+function dateKey(date) {
+  const pad = n => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}`;
+}
+
+// ── getDeptOTHours ───────────────────────────────────────────
+// Returns the planned OT hours for a dept on a specific date.
+// Priority: override > holiday (0) > sat hrs > weekday hrs > sun (0)
+function getDeptOTHours(deptObj, date, holidays) {
+  const key  = dateKey(date);
+  const type = dayType(date);
+
+  // Sunday — always 0
+  if (type === 'sun') return 0;
+
+  // Dept-level override takes highest priority
+  if (deptObj.overrides && deptObj.overrides[key] !== undefined) {
+    return deptObj.overrides[key];
+  }
+
+  // All-dept holiday — 0
+  if (holidays.includes(key)) return 0;
+
+  // Saturday or weekday
+  if (type === 'sat') return deptObj.saturdayHrs || 0;
+  return deptObj.weekdayHrs || 0;
+}
+
+// ── renderOTPlan ─────────────────────────────────────────────
+// Renders the full month OT plan as an editable grid.
+// Columns: Dept | Heads | Weekday Hrs | Sat Hrs |
+//          Monthly Total | OT to Date | Hrs/Head |
+//          [day 1] [day 2] ... [day N]
+function renderOTPlan() {
+  if (!otPlan) return;
+
+  const days     = getDaysInMonth(otPlanMonth);
+  const today    = new Date();
+  const todayKey = dateKey(today);
+  const holidays = otPlan.holidays || [];
+
+  // ── Build header ─────────────────────────────────────────
+  const dayNames = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+  const months   = ['Jan','Feb','Mar','Apr','May','Jun',
+                    'Jul','Aug','Sep','Oct','Nov','Dec'];
+
+  let thDates = '';
+  let thDays  = '';
+  days.forEach(d => {
+    const type   = dayType(d);
+    const key    = dateKey(d);
+    const isHol  = holidays.includes(key);
+    const isPast = d <= today;
+
+    // Column colour: Sunday=grey, Saturday=blue tint,
+    // holiday=amber, past weekday=white, future=light
+    const bg = type === 'sun'   ? '#f0f0f0'
+             : isHol            ? '#fff8e1'
+             : type === 'sat'   ? '#e8f0f8'
+             : isPast           ? '#fff'
+             :                    '#f9fbfd';
+
+ thDates += `<th style="padding:5px 6px;min-width:48px;background:${bg};
+              font-size:.72rem;text-align:center;">
+              ${d.getDate()}
+              <br/>
+              <button onclick="clearOTPDay('${key}')"
+                style="background:none;border:none;cursor:pointer;
+                       font-size:.65rem;color:#c0392b;padding:0;
+                       line-height:1.4;display:block;width:100%;
+                       text-align:center;">✕</button>
+            </th>`;
+  thDays += `<th style="padding:4px 6px;min-width:48px;background:${bg};
+              font-size:.68rem;text-align:center;color:#888;">
+              ${dayNames[d.getDay()]}
+            </th>`;
+  });
+
+  document.getElementById('otp-thead').innerHTML = `
+    <tr class="th-group">
+      <th rowspan="2" class="left" style="min-width:130px;padding:7px 10px;">Department</th>
+      <th rowspan="2" style="min-width:60px;padding:7px 8px;">Heads</th>
+      <th rowspan="2" style="min-width:70px;padding:7px 8px;">Weekday OT Hrs</th>
+      <th rowspan="2" style="min-width:70px;padding:7px 8px;">Saturday OT Hrs</th>
+      <th rowspan="2" style="min-width:80px;padding:7px 8px;background:#1a3a5c;color:#fff;">
+        Monthly Total OT Hrs
+      </th>
+      <th rowspan="2" style="min-width:75px;padding:7px 8px;background:#155a35;color:#fff;">
+        OT to Date
+      </th>
+      <th rowspan="2" style="min-width:65px;padding:7px 8px;">Hrs / Head</th>
+      ${thDates}
+    </tr>
+    <tr class="th-rate">${thDays}</tr>`;
+
+  // ── Build body rows ───────────────────────────────────────
+  let html = '';
+  let GT   = {
+    heads: 0, monthlyTotal: 0, toDate: 0,
+    dayTotals: new Array(days.length).fill(0)
+  };
+
+  otPlan.depts.forEach((deptObj, di) => {
+    // Calculate each day's hours
+    const dayHours = days.map(d => getDeptOTHours(deptObj, d, holidays));
+
+    // Monthly total = sum all days
+    const monthlyTotal = dayHours.reduce((s, h) => s + h, 0);
+
+    // OT to date = sum days where date <= today
+    const toDate = days.reduce((s, d, i) =>
+      d <= today ? s + dayHours[i] : s, 0);
+
+    const hrsPerHead = deptObj.heads > 0
+      ? (monthlyTotal / deptObj.heads).toFixed(1)
+      : '—';
+
+    // Accumulate grand totals
+    GT.heads        += deptObj.heads || 0;
+    GT.monthlyTotal += monthlyTotal;
+    GT.toDate       += toDate;
+    dayHours.forEach((h, i) => GT.dayTotals[i] += h);
+
+    // Day cells — editable only for non-Sunday cells
+    let dayCells = '';
+    days.forEach((d, i) => {
+      const type  = dayType(d);
+      const key   = dateKey(d);
+      const isHol = holidays.includes(key);
+      const hrs   = dayHours[i];
+
+      const bg = type === 'sun'   ? '#f0f0f0'
+               : isHol            ? '#fff8e1'
+               : type === 'sat'   ? '#e8f0f8'
+               : '#fff';
+
+      if (type === 'sun') {
+        // Sunday — always blank, not editable
+      dayCells += `<td style="background:#f0f0f0;text-align:center;
+               padding:4px 3px;color:#ccc;min-width:48px;">—</td>`;
+      } else {
+        // Editable cell — shows hours, HR can override per dept per date
+      dayCells += `<td style="background:${bg};padding:3px 4px;
+               text-align:center;min-width:48px;">
+  <input type="number" min="0" value="${hrs}"
+    style="width:55px;padding:4px 3px;border:1px solid #d0d8e4;
+           border-radius:3px;font-size:.78rem;text-align:center;
+           background:transparent;"
+    oninput="otpCellEdit(${di},'${key}',this.value)"
+    onkeydown="otpHandleTab(event,${di},'${key}','cell')"
+     onblur="renderOTPlan()"/>
+</td>`;
+      }
+    });
+
+    html += `<tr>
+      <td class="left" style="padding:6px 8px;font-weight:700;white-space:nowrap;">
+        ${deptObj.dept}
+      </td>
+      <!-- Heads — editable -->
+      <td style="padding:3px 5px;text-align:center;">
+        <input type="number" min="0" value="${deptObj.heads || 0}"
+          style="width:44px;padding:4px 5px;border:1px solid #d0d8e4;
+                border-radius:4px;font-size:.82rem;text-align:center;"
+          onchange="otpHeadEdit(${di},this.value)"
+          onkeydown="otpHandleTab(event,${di},'',  'heads')"
+          onblur="renderOTPlan()"/>
+      </td>
+      <!-- Weekday hours — editable, auto-fills all weekday cells -->
+      <td style="padding:3px 5px;text-align:center;">
+        <input type="number" min="0" value="${deptObj.weekdayHrs || 0}"
+          style="width:58px;padding:4px 5px;border:1px solid #d0d8e4;
+                 border-radius:4px;font-size:.82rem;text-align:center;"
+          oninput="otpWeekdayEdit(${di},this.value)"
+          onkeydown="otpHandleTab(event,${di},'',  'weekday')"
+            onblur="renderOTPlan()"/>
+      </td>
+      <!-- Saturday hours — editable, auto-fills all Saturday cells -->
+      <td style="padding:3px 5px;text-align:center;">
+        <input type="number" min="0" value="${deptObj.saturdayHrs || 0}"
+          style="width:58px;padding:4px 5px;border:1px solid #d0d8e4;
+                 border-radius:4px;font-size:.82rem;text-align:center;"
+          oninput="otpSatEdit(${di},this.value)"
+          onkeydown="otpHandleTab(event,${di},'',  'sat')"
+            onblur="renderOTPlan()"/>
+      </td>
+      <!-- Monthly total — calculated, read-only -->
+      <td style="padding:6px 8px;text-align:center;font-weight:700;
+                 color:#1a3a5c;background:#eef3f9;">
+        ${monthlyTotal.toLocaleString()}
+      </td>
+      <!-- OT to date — calculated, read-only -->
+      <td style="padding:6px 8px;text-align:center;font-weight:700;
+                 color:#1e8449;background:#f0faf0;">
+        ${toDate.toLocaleString()}
+      </td>
+      <!-- Hrs per head — calculated, read-only -->
+      <td style="padding:6px 8px;text-align:center;">${hrsPerHead}</td>
+      ${dayCells}
+    </tr>`;
+  });
+
+  document.getElementById('otp-tbody').innerHTML = html;
+
+  // ── Grand total footer ────────────────────────────────────
+  const gtHrsPerHead = GT.heads > 0
+    ? (GT.monthlyTotal / GT.heads).toFixed(1) : '—';
+
+  let gtDayCells = '';
+  days.forEach((d, i) => {
+    const type = dayType(d);
+    const bg   = type === 'sun' ? '#555' : type === 'sat' ? '#243f5c' : '';
+    gtDayCells += `<td style="padding:6px 5px;text-align:center;
+  min-width:48px;${bg ? 'background:'+bg+';' : ''}">
+  ${GT.dayTotals[i] > 0 ? GT.dayTotals[i].toLocaleString() : '—'}
+</td>`;
+  });
+
+  document.getElementById('otp-tfoot').innerHTML = `
+    <tr class="grand-row">
+      <td class="left" style="padding-left:10px;">GRAND TOTAL</td>
+      <td style="padding:7px 8px;text-align:center;">${GT.heads}</td>
+      <td colspan="2" style="padding:7px 8px;text-align:center;">—</td>
+      <td style="padding:7px 8px;text-align:center;">${GT.monthlyTotal.toLocaleString()}</td>
+      <td style="padding:7px 8px;text-align:center;">${GT.toDate.toLocaleString()}</td>
+      <td style="padding:7px 8px;text-align:center;">${gtHrsPerHead}</td>
+      ${gtDayCells}
+    </tr>`;
+}
+
+// ── otpHeadEdit ───────────────────────────────────────────────
+// Updates heads count for a dept and re-renders.
+function otpHeadEdit(di, value) {
+  otPlan.depts[di].heads = parseFloat(value) || 0;
+  //renderOTPlan();
+}
+
+// ── otpWeekdayEdit ────────────────────────────────────────────
+// Updates weekday hours for a dept, clears all weekday
+// overrides so the new value applies, then re-renders.
+function otpWeekdayEdit(di, value) {
+  const hrs     = parseFloat(value) || 0;
+  const deptObj = otPlan.depts[di];
+  deptObj.weekdayHrs = hrs;
+
+  // Clear weekday overrides so the new global value takes effect
+  const days = getDaysInMonth(otPlanMonth);
+  days.forEach(d => {
+    if (dayType(d) === 'weekday') {
+      const key = dateKey(d);
+      delete deptObj.overrides[key];
+    }
+  });
+  //renderOTPlan();
+}
+// ── otpHandleTab ─────────────────────────────────────────────
+// Intercepts Tab key on OT plan inputs to manually move focus
+// to the next input in the table, then triggers a re-render
+// of the current cell before leaving it.
+function otpHandleTab(e, di, key, type) {
+  if (e.key !== 'Tab') return;
+  e.preventDefault();   // stop browser default tab behaviour
+
+  // Save current cell value first
+  const val = parseFloat(e.target.value) || 0;
+  if      (type === 'heads')   otpHeadEdit(di, val);
+  else if (type === 'weekday') otpWeekdayEdit(di, val);
+  else if (type === 'sat')     otpSatEdit(di, val);
+  else if (type === 'cell')    otpCellEdit(di, key, val);
+
+  // Find all OT plan inputs in DOM order and move to next one
+  const allInputs = Array.from(
+    document.getElementById('otp-table').querySelectorAll('input[type="number"]')
+  );
+  const currentIdx = allInputs.indexOf(e.target);
+  const nextIdx    = e.shiftKey
+    ? currentIdx - 1   // Shift+Tab goes backwards
+    : currentIdx + 1;
+
+  if (nextIdx >= 0 && nextIdx < allInputs.length) {
+    allInputs[nextIdx].focus();
+    allInputs[nextIdx].select();   // select text so typing replaces it cleanly
+  } else {
+    // Reached last/first input — re-render to update calculated columns
+    renderOTPlan();
+  }
+}
+// ── otpSatEdit ────────────────────────────────────────────────
+// Updates Saturday hours for a dept, clears Saturday overrides.
+function otpSatEdit(di, value) {
+  const hrs     = parseFloat(value) || 0;
+  const deptObj = otPlan.depts[di];
+  deptObj.saturdayHrs = hrs;
+
+  // Clear Saturday overrides
+  const days = getDaysInMonth(otPlanMonth);
+  days.forEach(d => {
+    if (dayType(d) === 'sat') {
+      const key = dateKey(d);
+      delete deptObj.overrides[key];
+    }
+  });
+ //renderOTPlan();
+}
+
+// ── otpCellEdit ───────────────────────────────────────────────
+// Stores a per-dept per-date override when HR manually edits
+// a specific day cell. This persists through save.
+function otpCellEdit(di, key, value) {
+  otPlan.depts[di].overrides[key] = parseFloat(value) || 0;
+  //renderOTPlan();
+}
+
+// ── addOTPHoliday ─────────────────────────────────────────────
+// Marks a date as an all-dept holiday (sets all depts to 0
+// for that date). HR can still override individual depts after.
+function addOTPHoliday() {
+  const date = document.getElementById('otp-holiday-date').value;
+  if (!date) { toast('Select a date', true); return; }
+
+  // Add to holidays list if not already there
+  if (!otPlan.holidays.includes(date)) {
+    otPlan.holidays.push(date);
+  }
+
+  // Clear any dept-level overrides for this date so holiday takes effect
+  otPlan.depts.forEach(d => {
+    if (d.overrides[date] !== undefined) delete d.overrides[date];
+  });
+
+  document.getElementById('otp-holiday-status').textContent = `✔ ${date} set as holiday`;
+  setTimeout(() => document.getElementById('otp-holiday-status').textContent = '', 3000);
+
+  renderOTPlan();
+}
+
+// ── clearOTPDay ───────────────────────────────────────────────
+// Sets all dept hours to 0 for a specific date by storing a
+// 0 override for every dept on that date. HR can still edit
+// individual cells back after clearing.
+function clearOTPDay(key) {
+  if (!confirm(`Set all departments to 0 OT on ${key}?`)) return;
+
+  otPlan.depts.forEach(d => {
+    if (!d.overrides) d.overrides = {};
+    d.overrides[key] = 0;
+  });
+
+  // Also add to holidays list so the column shows the holiday tint
+  if (!otPlan.holidays.includes(key)) {
+    otPlan.holidays.push(key);
+  }
+
+  renderOTPlan();
+  toast(`All depts cleared for ${key}`);
+}
+
+// ── saveOTPlan ────────────────────────────────────────────────
+// Saves the full month plan to Firestore as ot_plans/{YYYY-MM}.
+async function saveOTPlan() {
+  if (!otPlan || !otPlanMonth) { toast('Load a month first', true); return; }
+
+  try {
+    await db.collection('ot_plans').doc(otPlanMonth).set({
+      ...otPlan,
+      savedAt: new Date().toISOString()
+    });
+    document.getElementById('otp-status').textContent = '✔ Saved!';
+    setTimeout(() => document.getElementById('otp-status').textContent = '', 3000);
+    toast('OT Plan saved!');
+  } catch (e) {
+    toast('Save error: ' + e.message, true);
+  }
+}
+
+// ── exportOTPImage ────────────────────────────────────────────
+// Captures the full OT plan table as a PNG.
+// Temporarily replaces all input elements with plain text so
+// values are not clipped by html2canvas input rendering.
+async function exportOTPImage() {
+  const scrollDiv = document.getElementById('otp-table-wrap');
+
+  // ── Step 1: Replace all inputs with styled spans ──────────
+  const inputs = Array.from(scrollDiv.querySelectorAll('input[type="number"]'));
+  inputs.forEach(inp => {
+    const span = document.createElement('span');
+    span.textContent          = inp.value || '0';
+    span.dataset.replaceInput = 'true';
+    span.style.cssText        =
+      'display:inline-block;width:100%;text-align:center;' +
+      'font-size:.78rem;font-weight:500;padding:4px 2px;';
+    inp.parentNode.replaceChild(span, inp);
+  });
+
+  // ── Step 2: Expand container for full render ──────────────
+  const origOv = scrollDiv.style.overflow;
+  const origW  = scrollDiv.style.width;
+  scrollDiv.style.overflow = 'visible';
+  scrollDiv.style.width    = scrollDiv.scrollWidth + 'px';
+
+  // ── Step 3: Capture ───────────────────────────────────────
+  const canvas = await html2canvas(scrollDiv, {
+    scale:           3,
+    width:           scrollDiv.scrollWidth,
+    height:          scrollDiv.scrollHeight,
+    windowWidth:     scrollDiv.scrollWidth,
+    windowHeight:    scrollDiv.scrollHeight,
+    backgroundColor: '#ffffff'
+  });
+
+  // ── Step 4: Restore overflow ──────────────────────────────
+  scrollDiv.style.overflow = origOv;
+  scrollDiv.style.width    = origW;
+
+  // ── Step 5: Re-render table to restore all inputs ─────────
+  // Re-render is the cleanest way to restore — avoids having
+  // to track and re-insert every input individually.
+  renderOTPlan();
+
+  // ── Step 6: Trigger download ──────────────────────────────
+  const link    = document.createElement('a');
+  link.download = `OT_Plan_${otPlanMonth}.png`;
   link.href     = canvas.toDataURL('image/png');
   link.click();
   toast('Captured!');
 }
 
-// ── Wire date change ─────────────────────────────────────────
-document.getElementById('att-date').addEventListener('change', loadAttDaily);
+// ════════════════════════════════════════════════════════════
+//  OT DAILY ENTRY + PLAN VS ACTUAL DASHBOARD
+//
+//  Daily Entry:
+//    Collection : ot_daily
+//    Doc ID     : "YYYY-MM-DD"
+//    Fields     : date, depts: [{ dept, preApproval, actual }]
+//
+//  Dashboard:
+//    Reads ot_plans/{YYYY-MM} for targets (full month + to date)
+//    Sums all ot_daily docs from 1st → today for actuals
+//
+//  Columns:
+//    Target OT Hrs          = monthly total from ot_plan
+//    Assigned Target (toDate)= plan sum day1→today
+//    Pre Approval OT        = sum of daily pre-approval day1→today
+//    Actual OT              = sum of daily actual day1→today
+//    Difference             = Pre Approval − Actual
+//    No of Employees        = heads from ot_plan
+//    Avg Hrs/Head (Initial) = Assigned Target / Heads
+//    Avg Hrs/Head (Actual)  = Actual OT / Heads
+//    Monthly Budgeted/Head  = Monthly Total / Heads
+// ════════════════════════════════════════════════════════════
+
+// In-memory daily entry rows — keyed by dept name
+let otDailyRows = {};
+
+// ── initOTDaily ──────────────────────────────────────────────
+// Sets today's date in the entry picker and dash month picker.
+function initOTDaily() {
+  const now = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  const today = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
+  const month = `${now.getFullYear()}-${pad(now.getMonth()+1)}`;
+  document.getElementById('otd-date').value       = today;
+  document.getElementById('otd-dash-month').value = month;
+}
+
+// ── loadOTDaily ──────────────────────────────────────────────
+// Loads the daily entry for the selected date.
+// Also loads the OT plan for that month so planned hours
+// can be shown as a reference column.
+async function loadOTDaily() {
+  const date = document.getElementById('otd-date').value;
+  if (!date) { toast('Select a date', true); return; }
+
+  const month  = date.slice(0, 7);   // "YYYY-MM"
+  const tbody  = document.getElementById('otd-entry-body');
+  tbody.innerHTML = '<tr><td colspan="5" class="loading-cell">⏳ Loading…</td></tr>';
+
+  try {
+    // Load saved daily entry
+    const dayDoc = await db.collection('ot_daily').doc(date).get();
+    const saved  = dayDoc.exists ? (dayDoc.data().depts || []) : [];
+    const savedMap = {};
+    saved.forEach(r => { savedMap[r.dept] = r; });
+
+    // Load OT plan for the month to show planned hours column
+    const planDoc  = await db.collection('ot_plans').doc(month).get();
+    const planData = planDoc.exists ? planDoc.data() : null;
+    const planMap  = {};
+    if (planData) {
+      planData.depts.forEach(d => { planMap[d.dept] = d; });
+    }
+
+    // Build in-memory rows
+    otDailyRows = {};
+    OT_DEPTS.forEach(dept => {
+      const s = savedMap[dept] || {};
+      otDailyRows[dept] = {
+        dept,
+        preApproval: s.preApproval || 0,
+        actual:      s.actual      || 0,
+      };
+    });
+
+    renderOTDailyEntry(planMap, date);
+  } catch (e) {
+    toast('Error loading OT daily: ' + e.message, true);
+    console.error(e);
+  }
+}
+
+// ── renderOTDailyEntry ───────────────────────────────────────
+// Renders the daily entry table with planned hours reference,
+// editable Pre Approval and Actual columns, and live diff.
+function renderOTDailyEntry(planMap, date) {
+  const tbody = document.getElementById('otd-entry-body');
+  const tfoot = document.getElementById('otd-entry-foot');
+  let   html  = '';
+  let   GT    = { planned: 0, preApproval: 0, actual: 0 };
+
+  OT_DEPTS.forEach(dept => {
+    const r       = otDailyRows[dept] || { preApproval: 0, actual: 0 };
+    const planObj = planMap[dept];
+
+    // Get planned hours for this specific date from the OT plan
+    let planned = 0;
+    if (planObj) {
+      const dateObj = new Date(date + 'T00:00:00');
+      planned = getDeptOTHours(planObj, dateObj, planMap._holidays || []);
+    }
+
+    const diff      = r.preApproval - r.actual;
+    const diffStyle = diff >= 0
+      ? 'color:#1e8449;font-weight:700;'
+      : 'color:#c0392b;font-weight:700;';
+    const diffDisp  = diff > 0 ? `+${diff}` : diff < 0 ? `(${Math.abs(diff)})` : '—';
+
+    GT.planned     += planned;
+    GT.preApproval += r.preApproval;
+    GT.actual      += r.actual;
+
+    // Tab-friendly inputs — onchange saves to memory, onblur re-renders
+    html += `<tr>
+      <td class="left" style="padding:6px 8px;font-weight:700;">${dept}</td>
+      <td style="padding:6px 8px;text-align:center;color:#1a3a5c;font-weight:700;">
+        ${planned || '—'}
+      </td>
+      <td style="padding:3px 5px;text-align:center;">
+        <input type="number" min="0" value="${r.preApproval}"
+          style="width:64px;padding:5px 6px;border:1px solid #d0d8e4;
+                 border-radius:4px;font-size:.85rem;text-align:center;"
+          onchange="otDailyInput('${dept}','preApproval',this.value)"
+          onblur="renderOTDailyEntry(window._otdPlanMap, window._otdDate)"
+          onkeydown="otdHandleTab(event,'${dept}','preApproval')"/>
+      </td>
+      <td style="padding:3px 5px;text-align:center;">
+        <input type="number" min="0" value="${r.actual}"
+          style="width:64px;padding:5px 6px;border:1px solid #d0d8e4;
+                 border-radius:4px;font-size:.85rem;text-align:center;"
+          onchange="otDailyInput('${dept}','actual',this.value)"
+          onblur="renderOTDailyEntry(window._otdPlanMap, window._otdDate)"
+          onkeydown="otdHandleTab(event,'${dept}','actual')"/>
+      </td>
+      <td style="padding:6px 8px;text-align:center;${diffStyle}">${diffDisp}</td>
+    </tr>`;
+  });
+
+  tbody.innerHTML = html;
+
+  // Store for re-render on blur
+  window._otdPlanMap = planMap;
+  window._otdDate    = date;
+
+  // Grand total footer
+  const gtDiff      = GT.preApproval - GT.actual;
+  const gtDiffStyle = gtDiff >= 0 ? '' : 'color:#f78166;';
+  const gtDiffDisp  = gtDiff > 0 ? `+${gtDiff}` : gtDiff < 0 ? `(${Math.abs(gtDiff)})` : '—';
+
+  tfoot.innerHTML = `<tr class="grand-row">
+    <td class="left" style="padding-left:10px;">TOTAL</td>
+    <td style="padding:7px 8px;text-align:center;">${GT.planned}</td>
+    <td style="padding:7px 8px;text-align:center;">${GT.preApproval}</td>
+    <td style="padding:7px 8px;text-align:center;">${GT.actual}</td>
+    <td style="padding:7px 8px;text-align:center;${gtDiffStyle}">${gtDiffDisp}</td>
+  </tr>`;
+}
+
+// ── otDailyInput ─────────────────────────────────────────────
+// Saves value to memory on every change without re-rendering.
+function otDailyInput(dept, field, value) {
+  if (!otDailyRows[dept]) otDailyRows[dept] = { preApproval: 0, actual: 0 };
+  otDailyRows[dept][field] = parseFloat(value) || 0;
+}
+
+// ── otdHandleTab ─────────────────────────────────────────────
+// Tab moves to next input without triggering re-render.
+function otdHandleTab(e, dept, field) {
+  if (e.key !== 'Tab') return;
+  e.preventDefault();
+
+  // Save current value first
+  otDailyInput(dept, field, e.target.value);
+
+  const allInputs = Array.from(
+    document.getElementById('otd-entry-table')
+      .querySelectorAll('input[type="number"]')
+  );
+  const idx  = allInputs.indexOf(e.target);
+  const next = e.shiftKey ? idx - 1 : idx + 1;
+
+  if (next >= 0 && next < allInputs.length) {
+    allInputs[next].focus();
+    allInputs[next].select();
+  } else {
+    renderOTDailyEntry(window._otdPlanMap, window._otdDate);
+  }
+}
+
+// ── saveOTDaily ──────────────────────────────────────────────
+// Saves all dept entries for the selected date to ot_daily.
+async function saveOTDaily() {
+  const date = document.getElementById('otd-date').value;
+  if (!date) { toast('Select a date', true); return; }
+
+  const depts = OT_DEPTS.map(dept => ({
+    dept,
+    preApproval: otDailyRows[dept]?.preApproval || 0,
+    actual:      otDailyRows[dept]?.actual      || 0,
+  }));
+
+  try {
+    await db.collection('ot_daily').doc(date).set({
+      date, depts,
+      savedAt: new Date().toISOString()
+    });
+    document.getElementById('otd-status').textContent = '✔ Saved!';
+    setTimeout(() => document.getElementById('otd-status').textContent = '', 3000);
+    toast('OT daily saved!');
+  } catch (e) {
+    toast('Save error: ' + e.message, true);
+  }
+}
+
+// ── loadOTDashboard ──────────────────────────────────────────
+// Loads the OT plan for the month and sums all ot_daily docs
+// from the 1st to today to build the dashboard.
+async function loadOTDashboard() {
+  const month = document.getElementById('otd-dash-month').value;
+  if (!month) { toast('Select a month', true); return; }
+
+  const tbody = document.getElementById('otd-dash-body');
+  tbody.innerHTML = '<tr><td colspan="10" class="loading-cell">⏳ Loading…</td></tr>';
+
+  try {
+    // ── Fetch OT Plan ─────────────────────────────────────
+    const planDoc = await db.collection('ot_plans').doc(month).get();
+    if (!planDoc.exists) {
+      tbody.innerHTML = '<tr><td colspan="10" class="loading-cell">' +
+        'No OT Plan found for this month. Create one in the OT Plan card above.</td></tr>';
+      return;
+    }
+    const plan     = planDoc.data();
+    const planMap  = {};
+    plan.depts.forEach(d => { planMap[d.dept] = d; });
+    const holidays = plan.holidays || [];
+
+    // ── Fetch all ot_daily docs for this month ────────────
+    const from = `${month}-01`;
+    const now  = new Date();
+    const pad  = n => String(n).padStart(2, '0');
+    const todayStr = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
+
+    const dailySnap = await db.collection('ot_daily')
+      .where('date', '>=', from)
+      .where('date', '<=', todayStr)
+      .get();
+
+    // Sum preApproval and actual per dept across all daily docs
+    const dailyTotals = {};   // { dept: { preApproval, actual } }
+    OT_DEPTS.forEach(d => { dailyTotals[d] = { preApproval: 0, actual: 0 }; });
+
+    dailySnap.forEach(doc => {
+      const data = doc.data();
+      (data.depts || []).forEach(r => {
+        if (dailyTotals[r.dept]) {
+          dailyTotals[r.dept].preApproval += r.preApproval || 0;
+          dailyTotals[r.dept].actual      += r.actual      || 0;
+        }
+      });
+    });
+
+    // ── Compute plan targets ──────────────────────────────
+    // Monthly total and to-date from the OT plan grid
+    const days = getDaysInMonth(month);
+    const planTargets = {};
+    OT_DEPTS.forEach(dept => {
+      const deptObj = planMap[dept];
+      if (!deptObj) {
+        planTargets[dept] = { monthlyTotal: 0, toDate: 0, heads: 0 };
+        return;
+      }
+      const dayHours    = days.map(d => getDeptOTHours(deptObj, d, holidays));
+      const monthlyTotal = dayHours.reduce((s, h) => s + h, 0);
+      const toDate       = days.reduce((s, d, i) =>
+        d <= now ? s + dayHours[i] : s, 0);
+      planTargets[dept]  = { monthlyTotal, toDate, heads: deptObj.heads || 0 };
+    });
+
+    // Format current month name + as-at date
+        const monthName = new Date(month + '-01').toLocaleDateString('en-LK', {
+          month: 'long', year: 'numeric'
+        });
+        const asAtDate = now.toLocaleDateString('en-LK', {
+          day: 'numeric', month: 'long', year: 'numeric'
+        });
+
+        document.getElementById('otd-month-label').textContent =
+          `${monthName}  •  As at ${asAtDate}`;
+            // ── Render dashboard table ────────────────────────────
+            renderOTDashboard(planTargets, dailyTotals);
+
+  } catch (e) {
+    toast('Error loading OT dashboard: ' + e.message, true);
+    console.error(e);
+  }
+}
+
+// ── renderOTDashboard ────────────────────────────────────────
+// Renders the Plan vs Actual summary table.
+function renderOTDashboard(planTargets, dailyTotals) {
+  const tbody = document.getElementById('otd-dash-body');
+  const tfoot = document.getElementById('otd-dash-foot');
+  let   html  = '';
+  let   GT    = {
+    monthlyTotal:0, toDate:0, preApproval:0,
+    actual:0, heads:0
+  };
+
+  OT_DEPTS.forEach(dept => {
+    const p   = planTargets[dept]  || { monthlyTotal:0, toDate:0, heads:0 };
+    const d   = dailyTotals[dept]  || { preApproval:0,  actual:0 };
+
+    const diff        = d.preApproval - d.actual;
+    const avgInitial  = p.heads > 0 ? (p.toDate       / p.heads).toFixed(0) : '—';
+    const avgActual   = p.heads > 0 ? (d.actual        / p.heads).toFixed(0) : '—';
+    const budgetedPH  = p.heads > 0 ? (p.monthlyTotal  / p.heads).toFixed(0) : '—';
+
+    const diffStyle = diff >= 0
+      ? 'color:#1e8449;font-weight:700;'
+      : 'color:#c0392b;font-weight:700;';
+    const diffDisp  = diff > 0
+      ? `+${diff}`
+      : diff < 0 ? `(${Math.abs(diff)})` : '—';
+
+    GT.monthlyTotal += p.monthlyTotal;
+    GT.toDate       += p.toDate;
+    GT.preApproval  += d.preApproval;
+    GT.actual       += d.actual;
+    GT.heads        += p.heads;
+
+    html += `<tr>
+      <td class="left" style="padding:6px 10px;font-weight:700;">${dept}</td>
+      <td style="padding:6px 8px;text-align:center;font-weight:700;
+                 color:#1a3a5c;background:#eef3f9;">
+        ${p.monthlyTotal.toLocaleString()}
+      </td>
+      <td style="padding:6px 8px;text-align:center;font-weight:700;
+                 color:#155a35;background:#f0faf0;">
+        ${p.toDate.toLocaleString()}
+      </td>
+      <td style="padding:6px 8px;text-align:center;">
+        ${d.preApproval.toLocaleString()}
+      </td>
+      <td style="padding:6px 8px;text-align:center;font-weight:700;">
+        ${d.actual.toLocaleString()}
+      </td>
+      <td style="padding:6px 8px;text-align:center;${diffStyle}">${diffDisp}</td>
+      <td style="padding:6px 8px;text-align:center;">${p.heads || '—'}</td>
+      <td style="padding:6px 8px;text-align:center;">${avgInitial}</td>
+      <td style="padding:6px 8px;text-align:center;">${avgActual}</td>
+      <td style="padding:6px 8px;text-align:center;font-weight:700;
+                 color:#6d5504;background:#fdf8e8;">
+        ${budgetedPH}
+      </td>
+    </tr>`;
+  });
+
+  tbody.innerHTML = html;
+
+  // Grand total footer
+  const gtDiff      = GT.preApproval - GT.actual;
+  const gtDiffStyle = gtDiff >= 0 ? '' : 'color:#f78166;';
+  const gtDiffDisp  = gtDiff > 0 ? `+${gtDiff}` : gtDiff < 0 ? `(${Math.abs(gtDiff)})` : '—';
+  const gtAvgInit   = GT.heads > 0 ? (GT.toDate      / GT.heads).toFixed(0) : '—';
+  const gtAvgAct    = GT.heads > 0 ? (GT.actual       / GT.heads).toFixed(0) : '—';
+  const gtBudgetPH  = GT.heads > 0 ? (GT.monthlyTotal / GT.heads).toFixed(0) : '—';
+
+  tfoot.innerHTML = `<tr class="grand-row">
+    <td class="left" style="padding-left:10px;">GRAND TOTAL</td>
+    <td style="padding:7px 8px;text-align:center;">
+      ${GT.monthlyTotal.toLocaleString()}
+    </td>
+    <td style="padding:7px 8px;text-align:center;">
+      ${GT.toDate.toLocaleString()}
+    </td>
+    <td style="padding:7px 8px;text-align:center;">
+      ${GT.preApproval.toLocaleString()}
+    </td>
+    <td style="padding:7px 8px;text-align:center;">
+      ${GT.actual.toLocaleString()}
+    </td>
+    <td style="padding:7px 8px;text-align:center;${gtDiffStyle}">
+      ${gtDiffDisp}
+    </td>
+    <td style="padding:7px 8px;text-align:center;">${GT.heads}</td>
+    <td style="padding:7px 8px;text-align:center;">${gtAvgInit}</td>
+    <td style="padding:7px 8px;text-align:center;">${gtAvgAct}</td>
+    <td style="padding:7px 8px;text-align:center;">${gtBudgetPH}</td>
+  </tr>`;
+}
+
+// ── exportOTDashImage ────────────────────────────────────────
+// Captures the Plan vs Actual dashboard as a PNG.
+async function exportOTDashImage() {
+  const month     = document.getElementById('otd-dash-month').value || 'ot';
+  const scrollDiv = document.getElementById('otd-dash-wrap');
+  const table     = document.getElementById('otd-dash-table');
+
+  const origOv = scrollDiv.style.overflow;
+  const origW  = scrollDiv.style.width;
+  scrollDiv.style.overflow = 'visible';
+  scrollDiv.style.width    = table.scrollWidth + 'px';
+
+  await new Promise(r => setTimeout(r, 80));
+
+  const canvas = await html2canvas(scrollDiv, {
+    scale:      3,
+    useCORS:    true,
+    allowTaint: true,
+    scrollX:    0,
+    scrollY:    -window.scrollY
+  });
+
+  scrollDiv.style.overflow = origOv;
+  scrollDiv.style.width    = origW;
+
+  const link    = document.createElement('a');
+  link.download = `OT_Dashboard_${month}.png`;
+  link.href     = canvas.toDataURL('image/png');
+  link.click();
+  toast('Captured!');
+}
+
+// ════════════════════════════════════════════════════════════
+//  HR ATTENDANCE DASHBOARD — AS PER DATE
+//  Exact read-only mirror of renderAttEntryTable().
+//  Loads attendance_daily/{date} and renders uneditable.
+//  All calculations identical to daily entry.
+// ════════════════════════════════════════════════════════════
+
+// ── initHRDashboard ──────────────────────────────────────────
+function initHRDashboard() {
+  const now = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  document.getElementById('hrd-date').value =
+    `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
+}
+
+// ── loadHRDashboard Attendance dashbord──────────────────────────────────────────
+// Fetches attendance_daily/{date}, builds a read-only row map,
+// then calls renderHRDashTable which mirrors renderAttEntryTable
+// exactly — same columns, same calculations, no inputs.
+async function loadHRDashboard() {
+  const date  = document.getElementById('hrd-date').value;
+  if (!date) { toast('Select a date', true); return; }
+
+  const tbody = document.getElementById('hrd-body');
+  tbody.innerHTML =
+    '<tr><td colspan="15" class="loading-cell">⏳ Loading…</td></tr>';
+
+  try {
+    const doc   = await db.collection('attendance_daily').doc(date).get();
+    const saved = doc.exists ? (doc.data().rows || []) : [];
+
+    // Build lookup map same as loadAttDaily
+    const savedMap = {};
+    saved.forEach(r => { savedMap[`${r.dept}_${r.shift}`] = r; });
+
+    // Build read-only row data (same shape as attDailyRows)
+    const rows = {};
+    ATT_DEPTS.forEach(({ dept, shift }) => {
+      const key = `${dept}_${shift}`;
+      const s   = savedMap[key] || {};
+      rows[key] = {
+        present:     s.present     || 0,
+        informed:    s.informed    || 0,
+        uninformed:  s.uninformed  || 0,
+        dayoff:      s.dayoff      || 0,
+        longabsent:  s.longabsent  || 0,
+        turnover:    s.turnover    || 0,
+        recruitment: s.recruitment || 0,
+      };
+    });
+
+    // Update as-at label
+    const d = new Date(date + 'T00:00:00');
+    document.getElementById('hrd-asat').textContent =
+      `As at ${d.toLocaleDateString('en-LK', {
+        weekday: 'long', day: 'numeric',
+        month:   'long', year: 'numeric'
+      })}`;
+
+    renderHRDashTable(rows);
+
+  } catch (e) {
+    toast('Error: ' + e.message, true);
+    console.error(e);
+  }
+}
+
+// ── renderHRDashTable ────────────────────────────────────────
+// Identical logic to renderAttEntryTable() but all data cells
+// are plain <td> text — no inputs. Same columns, same order,
+// same calculations, same rowspan merged absenteeism cell.
+function renderHRDashTable(rowData) {
+  const tbody          = document.getElementById('hrd-body');
+  const tfoot          = document.getElementById('hrd-foot');
+  let   lastDept       = null;
+  let   html           = [];
+
+  // ── Step 1: Pre-compute dept absenteeism % ─────────────────
+  const deptMeta = {};
+  ATT_DEPTS.forEach(({ dept, shift }) => {
+    const key         = `${dept}_${shift}`;
+    const r           = rowData[key]    || {};
+    const master      = attMasters[key] || { onRoll: 0 };
+    const onRoll      = master.onRoll   || 0;
+    const totalAbsent = (r.informed || 0) + (r.uninformed || 0);
+    const shiftAbsPct = onRoll > 0 ? (totalAbsent / onRoll) * 100 : 0;
+
+    if (!deptMeta[dept]) deptMeta[dept] = { rowspan: 0, shiftPctSum: 0 };
+    deptMeta[dept].rowspan++;
+    deptMeta[dept].shiftPctSum += shiftAbsPct;
+  });
+  Object.keys(deptMeta).forEach(dept => {
+    const m  = deptMeta[dept];
+    m.absPct = m.rowspan > 0
+      ? (m.shiftPctSum / m.rowspan).toFixed(2) + '%'
+      : '—';
+  });
+
+  // ── Step 2: Grand total accumulators ──────────────────────
+  let GT = {
+    revised:0, onRoll:0, present:0, informed:0, uninformed:0,
+    totalAbsent:0, dayoff:0, longabsent:0, turnover:0,
+    recruitment:0, excess:0
+  };
+
+  // ── Step 3: Build rows ─────────────────────────────────────
+  ATT_DEPTS.forEach(({ dept, shift }) => {
+    const key    = `${dept}_${shift}`;
+    const r      = rowData[key]    || {};
+    const master = attMasters[key] || { revised: 0, onRoll: 0 };
+    const meta   = deptMeta[dept];
+
+    const revised     = master.revised || 0;
+    const onRoll      = master.onRoll  || 0;
+    const totalAbsent = (r.informed || 0) + (r.uninformed || 0);
+    const excess      = onRoll - revised;
+    const tvPct       = onRoll > 0
+      ? ((r.turnover || 0) / onRoll * 100).toFixed(1) + '%'
+      : '—';
+
+    // Accumulate grand totals
+    GT.revised     += revised;
+    GT.onRoll      += onRoll;
+    GT.present     += r.present     || 0;
+    GT.informed    += r.informed    || 0;
+    GT.uninformed  += r.uninformed  || 0;
+    GT.totalAbsent += totalAbsent;
+    GT.dayoff      += r.dayoff      || 0;
+    GT.longabsent  += r.longabsent  || 0;
+    GT.turnover    += r.turnover    || 0;
+    GT.recruitment += r.recruitment || 0;
+    GT.excess      += excess;
+
+    const isFirstRow = dept !== lastDept;
+    lastDept = dept;
+
+    // ── Row background — first shift row of each dept ─────────
+    const rowBg = isFirstRow ? '#e8f0f8' : '#ffffff';
+
+    // ── Dept name cell — value on first row, empty on others ──
+    const deptCell = `<td class="left"
+      style="padding:6px 8px;font-weight:700;white-space:nowrap;
+             background:${rowBg};">
+      ${isFirstRow ? dept : ''}
+    </td>`;
+
+    // ── Shift badge ───────────────────────────────────────────
+    const badge = shift === 'General'
+      ? `<span class="badge-day">${shift}</span>`
+      : `<span class="badge-night">${shift}</span>`;
+
+    // ── Excess display ────────────────────────────────────────
+    const exStyle   = excess >= 0
+      ? 'color:#1e8449;font-weight:700;'
+      : 'color:#c0392b;font-weight:700;';
+    const exDisplay = excess > 0
+      ? `+${excess}` : excess < 0 ? `(${Math.abs(excess)})` : '—';
+
+    // ── Absenteeism % — value on first row, empty on others ───
+    const absPctCell = `<td
+      style="padding:6px 8px;text-align:center;font-weight:700;
+             border-left:2px solid #d9e5f2;background:#f5f8fd;">
+      ${isFirstRow ? meta.absPct : ''}
+    </td>`;
+
+    // ── Cell helper — applies row background + optional style ──
+    const c = (val, extra = '') =>
+      `<td style="padding:5px 8px;text-align:center;
+                  background:${rowBg};${extra}">
+         ${val || '—'}
+       </td>`;
+
+    html.push(`<tr>
+      ${deptCell}
+      <td style="padding:5px 8px;text-align:center;background:${rowBg};">
+        ${badge}
+      </td>
+      ${c(revised,          'font-weight:700;color:#1a3a5c;')}
+      ${c(onRoll,           'font-weight:700;')}
+      ${c(r.present,        'color:#1e8449;font-weight:700;')}
+      ${c(r.informed,       '')}
+      ${c(r.uninformed,     '')}
+      ${c(totalAbsent,      'font-weight:700;')}
+      ${c(r.dayoff,         '')}
+      ${c(r.longabsent,     '')}
+      ${c(r.turnover,       '')}
+      ${c(r.recruitment,    '')}
+      <td style="padding:5px 8px;text-align:center;
+                 background:${rowBg};${exStyle}">
+        ${exDisplay}
+      </td>
+      ${absPctCell}
+      <td style="padding:5px 8px;text-align:center;background:${rowBg};">
+        ${tvPct}
+      </td>
+    </tr>`);
+  });
+
+  tbody.innerHTML = html.join('');
+
+  // ── Grand total footer ─────────────────────────────────────
+  const gtAbsPct  = GT.onRoll > 0
+    ? ((GT.totalAbsent / GT.onRoll) * 100).toFixed(2) + '%' : '—';
+  const gtTvPct   = GT.onRoll > 0
+    ? ((GT.turnover    / GT.onRoll) * 100).toFixed(1) + '%' : '—';
+  const gtEx      = GT.excess > 0
+    ? `+${GT.excess}` : GT.excess < 0 ? `(${Math.abs(GT.excess)})` : '—';
+  const gtExStyle = GT.excess >= 0 ? '' : 'color:#f78166;';
+
+  tfoot.innerHTML = `<tr class="grand-row">
+    <td colspan="2" class="left" style="padding-left:10px;">TOTAL</td>
+    <td style="padding:7px 8px;text-align:center;">${GT.revised}</td>
+    <td style="padding:7px 8px;text-align:center;">${GT.onRoll}</td>
+    <td style="padding:7px 8px;text-align:center;">${GT.present}</td>
+    <td style="padding:7px 8px;text-align:center;">${GT.informed}</td>
+    <td style="padding:7px 8px;text-align:center;">${GT.uninformed}</td>
+    <td style="padding:7px 8px;text-align:center;">${GT.totalAbsent}</td>
+    <td style="padding:7px 8px;text-align:center;">${GT.dayoff}</td>
+    <td style="padding:7px 8px;text-align:center;">${GT.longabsent}</td>
+    <td style="padding:7px 8px;text-align:center;">${GT.turnover}</td>
+    <td style="padding:7px 8px;text-align:center;">${GT.recruitment}</td>
+    <td style="padding:7px 8px;text-align:center;${gtExStyle}">${gtEx}</td>
+    <td style="padding:7px 8px;text-align:center;
+               border-left:2px solid rgba(255,255,255,.3);">${gtAbsPct}</td>
+    <td style="padding:7px 8px;text-align:center;">${gtTvPct}</td>
+  </tr>`;
+}
+// ── exportHRDashImage ────────────────────────────────────────
+// Replaces no inputs here (all plain text) so straight capture.
+async function exportHRDashImage() {
+  const date  = document.getElementById('hrd-date').value || 'hr';
+  const wrap  = document.getElementById('hrd-wrap');
+  const table = document.getElementById('hrd-table');
+
+  const origOv = wrap.style.overflow;
+  const origW  = wrap.style.width;
+  wrap.style.overflow = 'visible';
+  wrap.style.width    = table.scrollWidth + 'px';
+
+  await new Promise(r => setTimeout(r, 80));
+
+  const canvas = await html2canvas(wrap, {
+    scale:      3,
+    useCORS:    true,
+    allowTaint: true,
+    scrollX:    0,
+    scrollY:    -window.scrollY
+  });
+
+  wrap.style.overflow = origOv;
+  wrap.style.width    = origW;
+
+  const link    = document.createElement('a');
+  link.download = `HR_Attendance_${date}.png`;
+  link.href     = canvas.toDataURL('image/png');
+  link.click();
+  toast('Captured!');
+}

@@ -544,6 +544,7 @@ table {
   background:      #fff;
 }
 
+
 /* Minimum width keeps the 24-column dashboard table readable */
 #dashTable { min-width: 1200px; }
 
@@ -672,6 +673,7 @@ tfoot tr.grand-row td {
   color:       #aaa;
   font-style:  italic;
 }
+
 
 
 /* ════════════════════════════════════════════════════════════
