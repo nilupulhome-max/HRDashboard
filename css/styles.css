@@ -831,7 +831,7 @@ tfoot tr.grand-row td {
 
   /* Tabs scroll horizontally instead of wrapping/squeezing —
      each tab keeps its natural width and the strip scrolls */
-   /*  .tabs {
+  .tabs {
     flex-wrap: nowrap;
     padding:   0 10px;
   }
@@ -839,27 +839,9 @@ tfoot tr.grand-row td {
     flex:      0 0 auto;
     padding:   10px 16px;
     font-size: 13px;
-  }*/
-
-  @media (max-width: 768px) {
-  .tabs {
-    display: flex;
-    flex-wrap: nowrap;     /* don't wrap to a new line */
-    overflow: hidden;      /* lock it - no horizontal drag/scroll */
-    width: 100%;
   }
 
-  .tab {
-    flex: 1;               /* equal width, fills the row */
-    min-width: 0;          /* allows shrinking instead of overflowing */
-    text-align: center;
-    padding: 10px 4px;
-    font-size: 12px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;  /* long tab names truncate instead of pushing width */
-  }
-}
+  
 
   /* Cards tighter on mobile */
   .card          { padding: 12px; margin-bottom: 12px; }
