@@ -7,26 +7,24 @@
 
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏭</text></svg>"/>
 
-  <!-- ── Styles ─────────────────────────────────────────── -->
+  <!-- ── Styles ──────────────────────────────────────────────── -->
   <link rel="stylesheet" href="css/styles.css"/>
 
-  <!-- ── Third-party scripts ────────────────────────────── -->
+  <!-- ── Third-party scripts ─────────────────────────────────── -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
   <!-- html5-qrcode: camera-based QR code scanning for meal requests -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
 </head>
 <body>
 
-<!-- ══════════════════════════════════════════════════════════ -->
-   
-<!-- ══════════════════════════════════════════════════════════
+<!-- ════════════════════════════════════════════════════════════
      LOGIN SCREEN
      Shown when no authenticated session exists.
      Hidden after a successful signInWithEmailAndPassword().
-══════════════════════════════════════════════════════════ -->
+════════════════════════════════════════════════════════════ -->
 <div id="loginScreen">
   <div class="login-box">
     <div class="login-logo">🏭</div>
@@ -47,13 +45,13 @@
 </div>
 
 
-<!-- ══════════════════════════════════════════════════════════
+<!-- ════════════════════════════════════════════════════════════
      MAIN APP SHELL
      Hidden until auth state confirms the user is signed in.
-══════════════════════════════════════════════════════════ -->
+════════════════════════════════════════════════════════════ -->
 <div id="appContent" style="display:none;">
 
-  <!-- ── HEADER ──────────────────────────────────────────── -->
+  <!-- ── HEADER ────────────────────────────────────────────── -->
   <header>
     <div class="header-inner">
       <div class="logo">🏭 HR Dashboard System</div>
@@ -61,8 +59,8 @@
       <!-- Firebase connection status badge (connecting / connected / error) -->
       <div id="db-badge" class="db-badge connecting">⏳ Connecting…</div>
 
-      <div id="user-email" style="font-size:.75rem;opacity:.8;color:#fff;"></div>
       <!-- Displays the signed-in user's email address after login -->
+      <div id="user-email" style="font-size:.75rem;opacity:.8;color:#fff;"></div>
 
       <!-- Live clock — updated every second by app.js -->
       <div class="hclock" id="clock"></div>
@@ -70,13 +68,19 @@
       <button class="btn-logout" onclick="logout()">Sign Out</button>
     </div>
 
-    <!-- ── TAB NAVIGATION ──────────────────────────────────
-         5 top-level tabs:
-           01. Security Data Entry  — canteen & manpower entry (unchanged)
-           02. HR Master Data       — attendance carder master, cost config, manpower master rates
+    <!-- ── TAB NAVIGATION ────────────────────────────────────
+         6 top-level tabs:
+           01. Security Data Entry  — canteen & manpower entry, meal request/issue, meal request log
+           02. HR Master Data       — shift roster, employee register, attendance carder master,
+                                       cost configuration, manpower master rates
            03. HR Data Entry        — daily attendance, daily OT cost, OT daily pre-approval & actual
            04. IE Data Entry        — OT plan monthly setup
-           05. Dashboards           — manpower summary, OT plan vs actual, canteen/meals/OT dashboard, HR dashboard
+           05. Dashboards           — manpower summary, OT plan vs actual, canteen/meals/OT
+                                       dashboard, HR attendance dashboard
+           06. Admin                — Transaction Data Manager: view/edit/delete any
+                                       ENTERED record (canteen, manpower, OT, attendance,
+                                       OT plans, meal requests). Master/config data stays
+                                       on HR Master Data, where it already has safer forms.
     ──────────────────────────────────────────────────────── -->
     <div class="tabs">
       <button class="tab active" onclick="switchTab('security-entry', this)">📝 Security Data Entry</button>
@@ -84,203 +88,203 @@
       <button class="tab"        onclick="switchTab('hr-entry',       this)">📋 HR Data Entry</button>
       <button class="tab"        onclick="switchTab('ie-entry',       this)">⏱ IE Data Entry</button>
       <button class="tab"        onclick="switchTab('dashboards',     this)">📊 Dashboards</button>
+      <button class="tab"        onclick="switchTab('admin',          this)">🛠 Admin</button>
     </div>
   </header>
 
 
-
   <!-- ════════════════════════════════════════════════════════
-       TAB 01 — SECURITY DATA ENTRY  (unchanged)
+       TAB 01 — SECURITY DATA ENTRY
        Contains:
-         • Canteen Shift Entry   — supplier / item / qty per shift
-         • Daily Manpower Entry  — headcount rows per date
+         • Meal Request   — scan/search employee, show eligible meals, submit request
+         • Daily Meal Request Log — searchable log of requests + status, for a selected date
+         • Meal Issue     — scan/search employee, show meals matching the active time slot
+         • Canteen Shift Entry   — supplier / item / qty per shift  (unchanged)
+         • Daily Manpower Entry  — headcount rows per date          (unchanged)
   ════════════════════════════════════════════════════════ -->
   <div id="tab-security-entry" class="tab-content active">
   <div class="container">
 
-    <!-- ══════════════════════════════════════════════════
-     MEAL REQUEST TAB
-     Security scans employee QR (or types EPF No manually)
-     → system shows eligible meals based on time, type,
-       dept, and resolved shift → security submits request
-     Collection: meal_requests
-══════════════════════════════════════════════════ -->
-<div class="card">
-  <div class="card-title">📷 Meal Request — Scan or Search Employee</div>
+    <!-- ── CARD: MEAL REQUEST ──────────────────────────────────
+         Security scans employee QR (or types EPF No manually)
+         → system shows eligible meals based on time, type,
+           dept, and resolved shift (see getMealEligibility() in
+           app.js) → security submits request.
+         Collection: meal_requests
+    ──────────────────────────────────────────────────────── -->
+    <div class="card">
+      <div class="card-title">📷 Meal Request — Scan or Search Employee</div>
 
-  <!-- ── Scan / Search controls ─────────────────────────── -->
-  <div class="form-grid-small" style="margin-bottom:14px;">
-    <div class="field" style="grid-column: span 2;">
-      <label>Manual EPF No Entry (fallback if camera unavailable)</label>
-      <input type="text" id="mr-manual-epf" placeholder="Type EPF No and press Enter"
-             onkeydown="if(event.key==='Enter') lookupEmployeeForRequest(this.value)"/>
-    </div>
-    <div class="field" style="justify-content:flex-end;">
-      <label>&nbsp;</label>
-      <button class="btn-save" onclick="toggleQRScanner()" id="mr-scan-toggle-btn">
-        📷 Start Camera Scan
-      </button>
-    </div>
-  </div>
-
-  <!-- QR scanner renders here when active -->
-  <div id="mr-qr-reader" style="max-width:380px;margin:0 auto 16px;display:none;"></div>
-
-  <!-- ── Employee result card — shown after successful lookup ── -->
-  <div id="mr-employee-card" style="display:none;background:#eef3f9;
-       border-radius:10px;padding:16px 18px;margin-top:10px;">
-
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;
-                flex-wrap:wrap;gap:10px;margin-bottom:14px;">
-      <div>
-        <div style="font-size:1.1rem;font-weight:700;color:#1a3a5c;" id="mr-emp-name"></div>
-        <div style="font-size:.8rem;color:#5a6e84;margin-top:2px;" id="mr-emp-meta"></div>
+      <!-- Scan / Search controls -->
+      <div class="form-grid-small" style="margin-bottom:14px;">
+        <div class="field" style="grid-column: span 2;">
+          <label>Manual EPF No Entry (fallback if camera unavailable)</label>
+          <input type="text" id="mr-manual-epf" placeholder="Type EPF No and press Enter"
+                 onkeydown="if(event.key==='Enter') lookupEmployeeForRequest(this.value)"/>
+        </div>
+        <div class="field" style="justify-content:flex-end;">
+          <label>&nbsp;</label>
+          <button class="btn-save" onclick="toggleQRScanner()" id="mr-scan-toggle-btn">
+            📷 Start Camera Scan
+          </button>
+        </div>
       </div>
-      <button class="btn-clear" onclick="clearEmployeeLookup()">✕ Clear</button>
-    </div>
 
-    <!-- Eligible meal options render here -->
-    <div id="mr-meal-options" style="display:grid;gap:10px;
-         grid-template-columns:repeat(auto-fill,minmax(220px,1fr));"></div>
+      <!-- QR scanner renders here when active -->
+      <div id="mr-qr-reader" style="max-width:380px;margin:0 auto 16px;display:none;"></div>
 
-         <!-- Eligible meal options render here -->
-<div id="mr-meal-options" style="display:grid;gap:10px;
-     grid-template-columns:repeat(auto-fill,minmax(220px,1fr));"></div>
+      <!-- Employee result card — shown after successful lookup -->
+      <div id="mr-employee-card" style="display:none;background:#eef3f9;
+           border-radius:10px;padding:16px 18px;margin-top:10px;">
 
-<!-- Tea options — grouped, side-by-side buttons per slot -->
-<div id="mr-tea-options" style="margin-top:16px;"></div>
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;
+                    flex-wrap:wrap;gap:10px;margin-bottom:14px;">
+          <div>
+            <div style="font-size:1.1rem;font-weight:700;color:#1a3a5c;" id="mr-emp-name"></div>
+            <div style="font-size:.8rem;color:#5a6e84;margin-top:2px;" id="mr-emp-meta"></div>
+          </div>
+          <button class="btn-clear" onclick="clearEmployeeLookup()">✕ Clear</button>
+        </div>
 
-    <!-- Already-requested meals for today/tomorrow show here -->
-    <div id="mr-existing-requests" style="margin-top:16px;"></div>
-  </div>
+        <!-- Eligible meal options render here (built from getMealEligibility()) -->
+        <div id="mr-meal-options" style="display:grid;gap:10px;
+             grid-template-columns:repeat(auto-fill,minmax(220px,1fr));"></div>
 
-  <div id="mr-status" style="margin-top:12px;font-size:.85rem;font-weight:600;"></div>
-</div>
+        <!-- Tea options — grouped, side-by-side Milk/Plain buttons per slot (Tea 1, Tea 2) -->
+        <div id="mr-tea-options" style="margin-top:16px;"></div>
 
-<!-- ══════════════════════════════════════════════════
-     DAILY MEAL REQUEST LOG
-     Shows all requests + their status for a selected date
-     Same scrollable + searchable pattern as Employee Register
-══════════════════════════════════════════════════ -->
-<div class="card">
-  <div class="card-title">📋 Daily Meal Request Log</div>
-
-  <div class="form-grid-small" style="margin-bottom:14px;">
-    <div class="field">
-      <label>Date</label>
-      <input type="date" id="mrl-date" onchange="loadMealRequestLog()"/>
-    </div>
-    <div class="field">
-      <label>Search by EPF No or Name</label>
-      <input type="text" id="mrl-search" placeholder="Type to search…"
-             oninput="mrl_currentPage = 1; renderMealRequestLog();"/>
-    </div>
-    <div class="field">
-      <label>Status</label>
-      <select id="mrl-status-filter" onchange="mrl_currentPage = 1; renderMealRequestLog();">
-        <option value="ALL">All Statuses</option>
-        <option value="Pending">Pending</option>
-        <option value="Issued">Issued</option>
-        <option value="Missed">Missed</option>
-      </select>
-    </div>
-    <div class="field" style="justify-content:flex-end;">
-      <label>&nbsp;</label>
-      <button class="btn-apply" onclick="loadMealRequestLog()">🔄 Refresh</button>
-    </div>
-  </div>
-
-  <div class="table-scroll" style="max-height:480px;overflow-y:auto;">
-    <table id="mrl-table">
-    <thead style="position:sticky;top:0;z-index:5;">
-          <tr class="th-sub">
-            <th class="left" style="padding:8px 10px;">EPF No</th>
-            <th class="left" style="padding:8px 10px;">Name</th>
-            <th style="padding:8px 10px;">Dept</th>
-            <th style="padding:8px 10px;">Type</th>
-            <th style="padding:8px 10px;">Shift</th>
-            <th class="left" style="padding:8px 10px;">Meals Requested</th>
-          </tr>
-        </thead>
-      <tbody id="mrl-table-body">
-        <tr><td colspan="9" class="loading-cell">Select a date to load.</td></tr>
-      </tbody>
-    </table>
-  </div>
-
-  <div style="display:flex;justify-content:space-between;align-items:center;
-              margin-top:12px;font-size:.82rem;">
-    <span id="mrl-page-info" style="color:#5a6e84;"></span>
-    <div style="display:flex;gap:6px;">
-      <button class="btn-clear" onclick="mrlGoToPage(mrl_currentPage - 1)">‹ Prev</button>
-      <button class="btn-clear" onclick="mrlGoToPage(mrl_currentPage + 1)">Next ›</button>
-    </div>
-  </div>
-</div>
-
-<!-- ══════════════════════════════════════════════════
-     MEAL ISSUE TAB
-     Security scans employee QR (or types EPF No) →
-     system shows ONLY the meal/tea whose time slot is
-     currently active AND has a Pending request →
-     security taps to mark Issued
-     Collection: meal_requests (updates existing docs)
-══════════════════════════════════════════════════ -->
-<div class="card">
-  <div class="card-title">🍽️ Meal Issue — Scan or Search Employee</div>
-
-  <!-- Current active slot indicator -->
-  <div id="mi-active-slot-banner" style="background:#fff8e1;border:1px solid #f0a500;
-       border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:.85rem;
-       font-weight:600;color:#854f0b;"></div>
-
-  <!-- ── Scan / Search controls ─────────────────────────── -->
-  <div class="form-grid-small" style="margin-bottom:14px;">
-    <div class="field" style="grid-column: span 2;">
-      <label>Manual EPF No Entry (fallback if camera unavailable)</label>
-      <input type="text" id="mi-manual-epf" placeholder="Type EPF No and press Enter"
-             onkeydown="if(event.key==='Enter') lookupEmployeeForIssue(this.value)"/>
-    </div>
-    <div class="field" style="justify-content:flex-end;">
-      <label>&nbsp;</label>
-      <button class="btn-save" onclick="toggleIssueQRScanner()" id="mi-scan-toggle-btn">
-        📷 Start Camera Scan
-      </button>
-    </div>
-  </div>
-
-  <!-- QR scanner renders here when active -->
-  <div id="mi-qr-reader" style="max-width:380px;margin:0 auto 16px;display:none;"></div>
-
-  <!-- ── Employee result card ────────────────────────────── -->
-  <div id="mi-employee-card" style="display:none;background:#eef3f9;
-       border-radius:10px;padding:16px 18px;margin-top:10px;">
-
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;
-                flex-wrap:wrap;gap:10px;margin-bottom:14px;">
-      <div>
-        <div style="font-size:1.1rem;font-weight:700;color:#1a3a5c;" id="mi-emp-name"></div>
-        <div style="font-size:.8rem;color:#5a6e84;margin-top:2px;" id="mi-emp-meta"></div>
+        <!-- Already-requested meals for today/tomorrow show here, so security
+             doesn't duplicate-submit a meal already on file -->
+        <div id="mr-existing-requests" style="margin-top:16px;"></div>
       </div>
-      <button class="btn-clear" onclick="clearIssueLookup()">✕ Clear</button>
-    </div>
 
-    <!-- Issuable meals (matching active time slot) render here -->
-    <div id="mi-issue-options" style="display:grid;gap:10px;
-         grid-template-columns:repeat(auto-fill,minmax(220px,1fr));"></div>
-  </div>
+      <div id="mr-status" style="margin-top:12px;font-size:.85rem;font-weight:600;"></div>
+    </div><!-- /card: meal request -->
 
-  <div id="mi-status" style="margin-top:12px;font-size:.85rem;font-weight:600;"></div>
-</div>
 
-    <!-- ══════════════════════════════════════════════════
-         CARD 1 — CANTEEN SHIFT ENTRY
+    <!-- ── CARD: DAILY MEAL REQUEST LOG ─────────────────────────
+         Shows all requests + their status for a selected date.
+         Same scrollable + searchable pattern as Employee Register.
+    ──────────────────────────────────────────────────────── -->
+    <div class="card">
+      <div class="card-title">📋 Daily Meal Request Log</div>
+
+      <div class="form-grid-small" style="margin-bottom:14px;">
+        <div class="field">
+          <label>Date</label>
+          <input type="date" id="mrl-date" onchange="loadMealRequestLog()"/>
+        </div>
+        <div class="field">
+          <label>Search by EPF No or Name</label>
+          <input type="text" id="mrl-search" placeholder="Type to search…"
+                 oninput="mrl_currentPage = 1; renderMealRequestLog();"/>
+        </div>
+        <div class="field">
+          <label>Status</label>
+          <select id="mrl-status-filter" onchange="mrl_currentPage = 1; renderMealRequestLog();">
+            <option value="ALL">All Statuses</option>
+            <option value="Pending">Pending</option>
+            <option value="Issued">Issued</option>
+            <option value="Missed">Missed</option>
+          </select>
+        </div>
+        <div class="field" style="justify-content:flex-end;">
+          <label>&nbsp;</label>
+          <button class="btn-apply" onclick="loadMealRequestLog()">🔄 Refresh</button>
+        </div>
+      </div>
+
+      <div class="table-scroll" style="max-height:480px;overflow-y:auto;">
+        <table id="mrl-table">
+          <thead style="position:sticky;top:0;z-index:5;">
+            <tr class="th-sub">
+              <th class="left" style="padding:8px 10px;">EPF No</th>
+              <th class="left" style="padding:8px 10px;">Name</th>
+              <th style="padding:8px 10px;">Dept</th>
+              <th style="padding:8px 10px;">Type</th>
+              <th style="padding:8px 10px;">Shift</th>
+              <th class="left" style="padding:8px 10px;">Meals Requested</th>
+            </tr>
+          </thead>
+          <tbody id="mrl-table-body">
+            <tr><td colspan="9" class="loading-cell">Select a date to load.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div style="display:flex;justify-content:space-between;align-items:center;
+                  margin-top:12px;font-size:.82rem;">
+        <span id="mrl-page-info" style="color:#5a6e84;"></span>
+        <div style="display:flex;gap:6px;">
+          <button class="btn-clear" onclick="mrlGoToPage(mrl_currentPage - 1)">‹ Prev</button>
+          <button class="btn-clear" onclick="mrlGoToPage(mrl_currentPage + 1)">Next ›</button>
+        </div>
+      </div>
+    </div><!-- /card: daily meal request log -->
+
+
+    <!-- ── CARD: MEAL ISSUE ─────────────────────────────────────
+         Security scans employee QR (or types EPF No) →
+         system shows ONLY the meal/tea whose time slot is
+         currently active AND has a Pending request →
+         security taps to mark Issued.
+         Collection: meal_requests (updates existing docs)
+    ──────────────────────────────────────────────────────── -->
+    <div class="card">
+      <div class="card-title">🍽️ Meal Issue — Scan or Search Employee</div>
+
+      <!-- Current active slot indicator -->
+      <div id="mi-active-slot-banner" style="background:#fff8e1;border:1px solid #f0a500;
+           border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:.85rem;
+           font-weight:600;color:#854f0b;"></div>
+
+      <!-- Scan / Search controls -->
+      <div class="form-grid-small" style="margin-bottom:14px;">
+        <div class="field" style="grid-column: span 2;">
+          <label>Manual EPF No Entry (fallback if camera unavailable)</label>
+          <input type="text" id="mi-manual-epf" placeholder="Type EPF No and press Enter"
+                 onkeydown="if(event.key==='Enter') lookupEmployeeForIssue(this.value)"/>
+        </div>
+        <div class="field" style="justify-content:flex-end;">
+          <label>&nbsp;</label>
+          <button class="btn-save" onclick="toggleIssueQRScanner()" id="mi-scan-toggle-btn">
+            📷 Start Camera Scan
+          </button>
+        </div>
+      </div>
+
+      <!-- QR scanner renders here when active -->
+      <div id="mi-qr-reader" style="max-width:380px;margin:0 auto 16px;display:none;"></div>
+
+      <!-- Employee result card -->
+      <div id="mi-employee-card" style="display:none;background:#eef3f9;
+           border-radius:10px;padding:16px 18px;margin-top:10px;">
+
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;
+                    flex-wrap:wrap;gap:10px;margin-bottom:14px;">
+          <div>
+            <div style="font-size:1.1rem;font-weight:700;color:#1a3a5c;" id="mi-emp-name"></div>
+            <div style="font-size:.8rem;color:#5a6e84;margin-top:2px;" id="mi-emp-meta"></div>
+          </div>
+          <button class="btn-clear" onclick="clearIssueLookup()">✕ Clear</button>
+        </div>
+
+        <!-- Issuable meals (matching active time slot) render here -->
+        <div id="mi-issue-options" style="display:grid;gap:10px;
+             grid-template-columns:repeat(auto-fill,minmax(220px,1fr));"></div>
+      </div>
+
+      <div id="mi-status" style="margin-top:12px;font-size:.85rem;font-weight:600;"></div>
+    </div><!-- /card: meal issue -->
+
+
+    <!-- ── CARD: CANTEEN SHIFT ENTRY ────────────────────────────
          Saves a single supplier-item quantity to Firestore.
          Document key: {date}_{shift}  (e.g. 2025-07-01_DAY)
          Supplier dropdown drives the Item dropdown via
          renderSupplierFields(). Item selection reveals the
          Qty field (and Biscuit Type if applicable).
-    ══════════════════════════════════════════════════ -->
+    ──────────────────────────────────────────────────────── -->
     <div class="card">
       <div class="card-title">📋 Canteen Shift Entry</div>
 
@@ -350,19 +354,16 @@
         <!-- Resets supplier, item, qty fields without touching date/shift -->
         <button class="btn-clear" onclick="clearForm()">✕ Clear</button>
       </div>
-    </div><!-- /card: canteen entry -->
+    </div><!-- /card: canteen shift entry -->
 
 
-    <!-- ══════════════════════════════════════════════════
-         CARD 2 — DAILY MANPOWER ENTRY
+    <!-- ── CARD: DAILY MANPOWER ENTRY ───────────────────────────
          Builds a list of Company/Shift/Section/Heads rows
          in memory (mpRows[]), then saves them all at once
          to manpower_entries/{date} in Firestore.
          Rates are pre-configured in the Manpower Master
          Rates card on the HR Master Data tab.
-    ══════════════════════════════════════════════════ -->
-
-    
+    ──────────────────────────────────────────────────────── -->
     <div class="card">
       <div class="card-title">👷 Daily Manpower Entry</div>
 
@@ -435,7 +436,7 @@
         <button class="btn-save" onclick="saveMpEntry()">💾 Save Manpower</button>
         <span class="save-status" id="mp-entry-status"></span>
       </div>
-    </div><!-- /card: manpower entry -->
+    </div><!-- /card: daily manpower entry -->
 
   </div><!-- /container -->
   </div><!-- /tab-security-entry -->
@@ -444,6 +445,8 @@
   <!-- ════════════════════════════════════════════════════════
        TAB 02 — HR MASTER DATA
        Contains:
+         • Shift Roster — Rotation Anchor
+         • Employee Register
          • Attendance — Carder Master
          • Cost Configuration (Rs) — HR Only
          • Manpower Master Rates
@@ -451,132 +454,135 @@
   <div id="tab-hr-master" class="tab-content">
   <div class="container-wide">
 
-    <!-- ══════════════════════════════════════════════════
-     MEAL SYSTEM — STEP 1: SHIFT ROSTER + EMPLOYEE REGISTER
-     Collections: shift_roster, employees
-══════════════════════════════════════════════════ -->
+    <!-- ── CARD: SHIFT ROSTER — ROTATION ANCHOR ─────────────────
+         Meal system step 1. Collection: shift_roster
+         The system auto-flips Shift A / Shift B between Day
+         and Night every week. Set ONE known reference week
+         below — HR only needs to update this if the rotation
+         pattern ever changes (e.g. after a holiday disrupts
+         the cycle).
+    ──────────────────────────────────────────────────────── -->
+    <div class="card">
+      <div class="card-title">🔄 Shift Roster — Rotation Anchor</div>
 
-<!-- ── Shift Roster Card ──────────────────────────── -->
-<div class="card">
-  <div class="card-title">🔄 Shift Roster — Rotation Anchor</div>
+      <p class="note" style="margin-bottom:14px;">
+        The system auto-flips Shift A / Shift B between Day and Night every week.
+        Set ONE known reference week below — HR only needs to update this if the
+        rotation pattern ever changes (e.g. after a holiday disrupts the cycle).
+      </p>
 
-  <p class="note" style="margin-bottom:14px;">
-    The system auto-flips Shift A / Shift B between Day and Night every week.
-    Set ONE known reference week below — HR only needs to update this if the
-    rotation pattern ever changes (e.g. after a holiday disrupts the cycle).
-  </p>
+      <div class="form-grid-small">
+        <div class="field">
+          <label>Anchor Date (any Monday where Shift A = DAY)</label>
+          <input type="date" id="roster-anchor-date"/>
+        </div>
+        <div class="field">
+          <label>Current Status (auto-calculated)</label>
+          <input type="text" id="roster-current-status" readonly/>
+        </div>
+      </div>
 
-  <div class="form-grid-small">
-    <div class="field">
-      <label>Anchor Date (any Monday where Shift A = DAY)</label>
-      <input type="date" id="roster-anchor-date"/>
-    </div>
-    <div class="field">
-      <label>Current Status (auto-calculated)</label>
-      <input type="text" id="roster-current-status" readonly/>
-    </div>
-  </div>
-
-  <div class="form-actions">
-    <button class="btn-save" onclick="saveShiftRoster()">💾 Save Anchor</button>
-    <span class="save-status" id="roster-status"></span>
-  </div>
-</div>
-
-<!-- ── Employee Register Card ─────────────────────── -->
-<div class="card">
-  <div class="card-title">🪪 Employee Register</div>
-
-  <div class="form-grid-small" style="margin-bottom:14px;">
-    <div class="field">
-      <label>EPF No (QR Code Value)</label>
-      <input type="text" id="emp-epfno" placeholder="e.g. EPF1234"/>
-    </div>
-    <div class="field">
-      <label>Name</label>
-      <input type="text" id="emp-name" placeholder="Full name"/>
-    </div>
-    <div class="field">
-      <label>Department</label>
-      <select id="emp-dept"><option value="">— select —</option></select>
-    </div>
-    <div class="field">
-      <label>Shift Code (fixed)</label>
-      <select id="emp-shiftcode">
-        <option value="A">Shift A</option>
-        <option value="B">Shift B</option>
-        <option value="General">General</option>
-      </select>
-    </div>
-    <div class="field">
-      <label>Type</label>
-      <select id="emp-type">
-        <option value="HomeLiving">Home Living</option>
-        <option value="Boarding">Boarding</option>
-      </select>
-    </div>
-  </div>
-
-  <div class="form-actions">
-    <button class="btn-save" id="emp-save-btn" onclick="saveEmployee()">➕ Add Employee</button>
-    <button class="btn-clear" id="emp-cancel-btn" onclick="cancelEmployeeEdit()" style="display:none;">✕ Cancel</button>
-    <span class="save-status" id="emp-status"></span>
-  </div>
-
-  <!-- Search bar for the employee list -->
-<!-- Search + pagination controls -->
-<div class="form-grid-small" style="margin-top:14px;margin-bottom:10px;">
-  <div class="field">
-    <label>Search by EPF No or Name</label>
-    <input type="text" id="emp-search" placeholder="Type to search…"
-           oninput="emp_currentPage = 1; renderEmployeeTable();"/>
-  </div>
-  <div class="field">
-    <label>Rows per page</label>
-    <select id="emp-page-size" onchange="emp_currentPage = 1; renderEmployeeTable();">
-      <option value="10">10</option>
-      <option value="15" selected>15</option>
-      <option value="25">25</option>
-      <option value="50">50</option>
-    </select>
-  </div>
-</div>
-
-<div class="table-scroll" style="max-height:480px;overflow-y:auto;">
-  <table id="emp-table">
-    <thead style="position:sticky;top:0;z-index:5;">
-      <tr class="th-sub">
-        <th class="left" style="padding:8px 10px;">EPF No</th>
-        <th class="left" style="padding:8px 10px;">Name</th>
-        <th style="padding:8px 10px;">Department</th>
-        <th style="padding:8px 10px;">Shift Code</th>
-        <th style="padding:8px 10px;">Type</th>
-        <th style="padding:8px 10px;">Actions</th>
-      </tr>
-    </thead>
-    <tbody id="emp-table-body">
-      <tr><td colspan="6" class="loading-cell">⏳ Loading…</td></tr>
-    </tbody>
-  </table>
-</div>
-
-<!-- Pagination controls -->
-<div style="display:flex;justify-content:space-between;align-items:center;
-            margin-top:12px;font-size:.82rem;">
-  <span id="emp-page-info" style="color:#5a6e84;"></span>
-  <div style="display:flex;gap:6px;">
-    <button class="btn-clear" onclick="empGoToPage(emp_currentPage - 1)">‹ Prev</button>
-    <button class="btn-clear" onclick="empGoToPage(emp_currentPage + 1)">Next ›</button>
-  </div>
-</div>
-</div>
+      <div class="form-actions">
+        <button class="btn-save" onclick="saveShiftRoster()">💾 Save Anchor</button>
+        <span class="save-status" id="roster-status"></span>
+      </div>
+    </div><!-- /card: shift roster -->
 
 
-    <!-- ══════════════════════════════════════════════════
-         ATTENDANCE MASTER — Total Required Carder
+    <!-- ── CARD: EMPLOYEE REGISTER ───────────────────────────────
+         Meal system step 1 (continued). Collection: employees
+    ──────────────────────────────────────────────────────── -->
+    <div class="card">
+      <div class="card-title">🪪 Employee Register</div>
+
+      <div class="form-grid-small" style="margin-bottom:14px;">
+        <div class="field">
+          <label>EPF No (QR Code Value)</label>
+          <input type="text" id="emp-epfno" placeholder="e.g. EPF1234"/>
+        </div>
+        <div class="field">
+          <label>Name</label>
+          <input type="text" id="emp-name" placeholder="Full name"/>
+        </div>
+        <div class="field">
+          <label>Department</label>
+          <select id="emp-dept"><option value="">— select —</option></select>
+        </div>
+        <div class="field">
+          <label>Shift Code (fixed)</label>
+          <select id="emp-shiftcode">
+            <option value="A">Shift A</option>
+            <option value="B">Shift B</option>
+            <option value="General">General</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Type</label>
+          <select id="emp-type">
+            <option value="HomeLiving">Home Living</option>
+            <option value="Boarding">Boarding</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button class="btn-save" id="emp-save-btn" onclick="saveEmployee()">➕ Add Employee</button>
+        <button class="btn-clear" id="emp-cancel-btn" onclick="cancelEmployeeEdit()" style="display:none;">✕ Cancel</button>
+        <span class="save-status" id="emp-status"></span>
+      </div>
+
+      <!-- Search + pagination controls for the employee list -->
+      <div class="form-grid-small" style="margin-top:14px;margin-bottom:10px;">
+        <div class="field">
+          <label>Search by EPF No or Name</label>
+          <input type="text" id="emp-search" placeholder="Type to search…"
+                 oninput="emp_currentPage = 1; renderEmployeeTable();"/>
+        </div>
+        <div class="field">
+          <label>Rows per page</label>
+          <select id="emp-page-size" onchange="emp_currentPage = 1; renderEmployeeTable();">
+            <option value="10">10</option>
+            <option value="15" selected>15</option>
+            <option value="25">25</option>
+            <option value="50">50</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="table-scroll" style="max-height:480px;overflow-y:auto;">
+        <table id="emp-table">
+          <thead style="position:sticky;top:0;z-index:5;">
+            <tr class="th-sub">
+              <th class="left" style="padding:8px 10px;">EPF No</th>
+              <th class="left" style="padding:8px 10px;">Name</th>
+              <th style="padding:8px 10px;">Department</th>
+              <th style="padding:8px 10px;">Shift Code</th>
+              <th style="padding:8px 10px;">Type</th>
+              <th style="padding:8px 10px;">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="emp-table-body">
+            <tr><td colspan="6" class="loading-cell">⏳ Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Pagination controls -->
+      <div style="display:flex;justify-content:space-between;align-items:center;
+                  margin-top:12px;font-size:.82rem;">
+        <span id="emp-page-info" style="color:#5a6e84;"></span>
+        <div style="display:flex;gap:6px;">
+          <button class="btn-clear" onclick="empGoToPage(emp_currentPage - 1)">‹ Prev</button>
+          <button class="btn-clear" onclick="empGoToPage(emp_currentPage + 1)">Next ›</button>
+        </div>
+      </div>
+    </div><!-- /card: employee register -->
+
+
+    <!-- ── CARD: ATTENDANCE — CARDER MASTER ─────────────────────
          Collection : attendance_masters
          Doc ID     : "{dept}_{shift}"
-    ══════════════════════════════════════════════════ -->
+    ──────────────────────────────────────────────────────── -->
     <div class="card">
       <div class="card-title">👥 Attendance — Carder Master</div>
 
@@ -621,12 +627,11 @@
     </div><!-- /card: attendance carder master -->
 
 
-    <!-- ══════════════════════════════════════════════════
-         COST CONFIGURATION (HR Only)
+    <!-- ── CARD: COST CONFIGURATION (HR ONLY) ───────────────────
          Sets per-unit rates stored in Firestore at
          config/costs. Changes here recalculate all
          dashboard totals immediately on next load.
-    ══════════════════════════════════════════════════ -->
+    ──────────────────────────────────────────────────────── -->
     <div class="card">
       <div class="card-title">⚙ Cost Configuration (Rs) — HR Only</div>
 
@@ -651,16 +656,15 @@
         <button class="btn-save" onclick="saveCosts()">💾 Save Costs</button>
         <span class="save-status" id="costStatus"></span>
       </div>
-    </div><!-- /card: cost config -->
+    </div><!-- /card: cost configuration -->
 
 
-    <!-- ══════════════════════════════════════════════════
-         MANPOWER MASTER RATES
+    <!-- ── CARD: MANPOWER MASTER RATES ───────────────────────────
          Defines the per-head daily rate for each
          Company / Shift / Section combination.
          These rates are referenced by the Security Data
          Entry manpower form when adding rows.
-    ══════════════════════════════════════════════════ -->
+    ──────────────────────────────────────────────────────── -->
     <div class="card">
       <div class="card-title">📋 Manpower Master Rates</div>
 
@@ -713,7 +717,6 @@
       </div>
     </div><!-- /card: manpower master rates -->
 
-
   </div><!-- /container-wide -->
   </div><!-- /tab-hr-master -->
 
@@ -728,13 +731,11 @@
   <div id="tab-hr-entry" class="tab-content">
   <div class="container-wide">
 
-
-    <!-- ══════════════════════════════════════════════════
-         DAILY ATTENDANCE ENTRY
+    <!-- ── CARD: DAILY ATTENDANCE ENTRY ──────────────────────────
          Collection : attendance_daily
          Doc ID     : "{date}"  e.g. "2026-06-11"
-         Each doc holds an array of rows, one per dept+shift
-    ══════════════════════════════════════════════════ -->
+         Each doc holds an array of rows, one per dept+shift.
+    ──────────────────────────────────────────────────────── -->
     <div class="card">
       <div class="card-title">📋 Daily Attendance Entry</div>
 
@@ -754,12 +755,15 @@
               <th rowspan="2" style="min-width:80px;">Revised Required</th>
               <th rowspan="2" style="min-width:80px;">On Roll</th>
               <th colspan="4" class="grp-mc">Attendance</th>
+              <th rowspan="2">Special Reason</th>
               <th rowspan="2">Day Off</th>
               <th rowspan="2">Long Absent (&gt;4)</th>
               <th rowspan="2">Turnover</th>
               <th rowspan="2">Recruitment</th>
               <th rowspan="2" style="min-width:80px;">Excess / (Short)</th>
-              <th rowspan="2" style="min-width:90px;border-left:2px solid #b0bec5;">Absenteeism %<br><small style="font-weight:400;font-size:.65rem;">(dept level)</small></th>
+              <th rowspan="2" style="min-width:90px;border-left:2px solid #b0bec5;">
+                Absenteeism %<br><small style="font-weight:400;font-size:.65rem;">(dept level)</small>
+              </th>
               <th rowspan="2">Turnover %</th>
             </tr>
             <tr class="th-sub">
@@ -770,7 +774,7 @@
             </tr>
           </thead>
           <tbody id="att-entry-body">
-            <tr><td colspan="15" class="loading-cell">Select a date to load.</td></tr>
+            <tr><td colspan="16" class="loading-cell">Select a date to load.</td></tr>
           </tbody>
           <tfoot id="att-entry-foot"></tfoot>
         </table>
@@ -778,18 +782,17 @@
 
       <div class="form-actions" style="margin-top:14px;">
         <button class="btn-save"   onclick="saveAttDaily()">💾 Save Attendance</button>
-        <!--<button class="btn-export" onclick="exportAttImage()">📷 Export Image</button> -->
+        <!-- <button class="btn-export" onclick="exportAttImage()">📷 Export Image</button> -->
         <span class="save-status" id="att-daily-status"></span>
       </div>
     </div><!-- /card: daily attendance entry -->
 
 
-    <!-- ══════════════════════════════════════════════════
-         DAILY OT COST
+    <!-- ── CARD: DAILY OT COST ───────────────────────────────────
          Formula: Hours × Master OT Rate
          Records daily overtime hours for DAY and NIGHT
          shifts. Stored in ot_entries/{date}.
-    ══════════════════════════════════════════════════ -->
+    ──────────────────────────────────────────────────────── -->
     <div class="card">
       <div class="card-title">
         ⏱ Daily OT Cost
@@ -847,11 +850,10 @@
     </div><!-- /card: daily OT cost -->
 
 
-    <!-- ══════════════════════════════════════════════════
-         OT DAILY ENTRY — PRE APPROVAL & ACTUAL
+    <!-- ── CARD: OT DAILY ENTRY — PRE APPROVAL & ACTUAL ─────────
          Collection : ot_daily
          Document ID: "YYYY-MM-DD"
-    ══════════════════════════════════════════════════ -->
+    ──────────────────────────────────────────────────────── -->
     <div class="card">
       <div class="card-title">⏱ OT Daily Entry — Pre Approval &amp; Actual</div>
 
@@ -890,7 +892,6 @@
       </div>
     </div><!-- /card: OT daily entry -->
 
-
   </div><!-- /container-wide -->
   </div><!-- /tab-hr-entry -->
 
@@ -903,12 +904,10 @@
   <div id="tab-ie-entry" class="tab-content">
   <div class="container-wide">
 
-
-    <!-- ══════════════════════════════════════════════════
-         OT PLAN — MONTHLY MASTER
+    <!-- ── CARD: OT PLAN — MONTHLY MASTER ────────────────────────
          Collection : ot_plans
          Document ID: "YYYY-MM"  e.g. "2026-05"
-    ══════════════════════════════════════════════════ -->
+    ──────────────────────────────────────────────────────── -->
     <div class="card">
       <div class="card-title">⏱ OT Plan — Monthly Setup</div>
 
@@ -964,7 +963,6 @@
 
     </div><!-- /card: OT plan monthly setup -->
 
-
   </div><!-- /container-wide -->
   </div><!-- /tab-ie-entry -->
 
@@ -973,19 +971,17 @@
        TAB 05 — DASHBOARDS
        Contains:
          • Manpower Summary
-         • 📊 OT Plan vs Actual Dashboard
+         • OT Plan vs Actual Dashboard
          • Canteen / Meals / Tea / Manpower & OT Cost Dashboard
          • HR Dashboard — "as per Date"
   ════════════════════════════════════════════════════════ -->
   <div id="tab-dashboards" class="tab-content">
   <div class="container-wide">
 
-
-    <!-- ══════════════════════════════════════════════════
-         MANPOWER SUMMARY
+    <!-- ── CARD: MANPOWER SUMMARY ────────────────────────────────
          Read-only date-range view of all saved manpower
          entries. Click Load to query manpower_entries.
-    ══════════════════════════════════════════════════ -->
+    ──────────────────────────────────────────────────────── -->
     <div class="card">
       <div class="card-title"> 🏢 Manpower Summary</div>
 
@@ -1019,11 +1015,9 @@
     </div><!-- /card: manpower summary -->
 
 
-    <!-- ══════════════════════════════════════════════════
-         OT PLAN VS ACTUAL DASHBOARD
-         Dashboard reads : ot_plans/{YYYY-MM} +
-                           ot_daily docs for month
-    ══════════════════════════════════════════════════ -->
+    <!-- ── CARD: OT PLAN VS ACTUAL DASHBOARD ────────────────────
+         Reads: ot_plans/{YYYY-MM} + ot_daily docs for the month
+    ──────────────────────────────────────────────────────── -->
     <div class="card">
       <div class="card-title">⏱️ OT Plan vs Actual Dashboard</div>
 
@@ -1042,14 +1036,14 @@
       <div class="table-scroll" id="otd-dash-wrap">
         <table id="otd-dash-table">
           <caption style="text-align:left;padding:10px 10px 8px;
-                            border-bottom:2px solid #1a3a5c;margin-bottom:4px;
-                            caption-side:top;background:#fff;">
-              <div style="font-size:.95rem;font-weight:700;color:#1a3a5c;">
-                ⏱️ OT Plan vs Actual Dashboard
-              </div>
-              <div id="otd-month-label" style="font-size:.78rem;color:#555;margin-top:3px;"></div>
-            </caption>
-          
+                          border-bottom:2px solid #1a3a5c;margin-bottom:4px;
+                          caption-side:top;background:#fff;">
+            <div style="font-size:.95rem;font-weight:700;color:#1a3a5c;">
+              ⏱️ OT Plan vs Actual Dashboard
+            </div>
+            <div id="otd-month-label" style="font-size:.78rem;color:#555;margin-top:3px;"></div>
+          </caption>
+
           <thead>
             <tr class="th-group">
               <th rowspan="2" class="left" style="min-width:130px;padding:7px 10px;">
@@ -1094,12 +1088,11 @@
     </div><!-- /card: OT plan vs actual dashboard -->
 
 
-    <!-- ══════════════════════════════════════════════════
-         CANTEEN / MEALS / TEA / MANPOWER & OT COST DASHBOARD
+    <!-- ── CARD: CANTEEN / MEALS / TEA / MANPOWER & OT COST DASHBOARD
          Filter bar controls the date range and shift filter
          applied to the main dashboard table.
          Also houses Export (CSV, Image) and Clear actions.
-    ══════════════════════════════════════════════════ -->
+    ──────────────────────────────────────────────────────── -->
     <div class="card">
       <div class="card-title">📊 Canteen, Meals, Tea &amp; OT Cost Dashboard</div>
 
@@ -1129,9 +1122,7 @@
         <button class="btn-delete" id="clearBtn" onclick="clearRangeRecords()">🗑 Clear Records</button>
       </div><!-- /filter-bar -->
 
-
-      <!-- ══════════════════════════════════════════════════
-           MAIN DASHBOARD TABLE
+      <!-- ── MAIN DASHBOARD TABLE ────────────────────────────
            Rendered by renderTable() after loadDashboard().
            24 columns across 3 header rows:
              Row 1: Supplier group headers (colspans)
@@ -1148,17 +1139,17 @@
              Manpower (Heads, Cost) |
              OT (Hours, Cost) |
              Daily Total
-      ══════════════════════════════════════════════════ -->
+      ──────────────────────────────────────────────────── -->
       <div class="table-scroll">
         <table id="dashTable">
-            <caption style="text-align:left;padding:10px 10px 8px;
-                  border-bottom:2px solid #1a3a5c;margin-bottom:4px;
-                  caption-side:top;background:#fff;">
-    <div style="font-size:.95rem;font-weight:700;color:#1a3a5c;">
-       📊 Canteen, Meals, Tea & OT Cost Dashboard
-    </div>
-    <div id="dash-date-label" style="font-size:.78rem;color:#555;margin-top:3px;"></div>
-  </caption>
+          <caption style="text-align:left;padding:10px 10px 8px;
+                          border-bottom:2px solid #1a3a5c;margin-bottom:4px;
+                          caption-side:top;background:#fff;">
+            <div style="font-size:.95rem;font-weight:700;color:#1a3a5c;">
+              📊 Canteen, Meals, Tea & OT Cost Dashboard
+            </div>
+            <div id="dash-date-label" style="font-size:.78rem;color:#555;margin-top:3px;"></div>
+          </caption>
           <thead>
 
             <!-- Row 1: Supplier group headers -->
@@ -1223,89 +1214,168 @@
     </div><!-- /card: canteen/meals/OT dashboard -->
 
 
-   <!-- ══════════════════════════════════════════════════
-     HR ATTENDANCE DASHBOARD — AS PER DATE
-     Read-only mirror of Daily Attendance Entry table.
-     Reads: attendance_daily/{date}
-══════════════════════════════════════════════════ -->
-<div class="card">
-  <div class="card-title">👥 HR Dashboard — Daily Attendance</div>
+    <!-- ── CARD: HR ATTENDANCE DASHBOARD — AS PER DATE ──────────
+         Read-only mirror of Daily Attendance Entry table.
+         Reads: attendance_daily/{date}
+    ──────────────────────────────────────────────────────── -->
+    <div class="card">
+      <div class="card-title">👥 HR Dashboard — Daily Attendance</div>
 
-  <div class="filter-bar" style="margin-bottom:14px;box-shadow:none;padding:0;">
-    <div class="field-inline">
-      <label>Date</label>
-      <input type="date" id="hrd-date"/>
-    </div>
-    <button class="btn-apply"  onclick="loadHRDashboard()">🔄 Load</button>
-    <button class="btn-export" onclick="exportHRDashImage()">📷 Capture</button>
-  </div>
-
-  <!-- Single scroll wrapper — title + date + table all inside -->
-  <div class="table-scroll" id="hrd-wrap">
-    <table id="hrd-table">
-
-      <!-- Caption acts as the heading row inside the table
-           so it is always captured with the table -->
-      <caption style="text-align:left;padding:10px 10px 8px;
-                      border-bottom:2px solid #1a3a5c;margin-bottom:4px;
-                      caption-side:top;background:#fff;">
-        <div style="font-size:.95rem;font-weight:700;color:#1a3a5c;">
-          👥 Daily Attendance
+      <div class="filter-bar" style="margin-bottom:14px;box-shadow:none;padding:0;">
+        <div class="field-inline">
+          <label>Date</label>
+          <input type="date" id="hrd-date"/>
         </div>
-        <div id="hrd-asat" style="font-size:.78rem;color:#555;margin-top:3px;"></div>
-      </caption>
+        <button class="btn-apply"  onclick="loadHRDashboard()">🔄 Load</button>
+        <button class="btn-export" onclick="exportHRDashImage()">📷 Capture</button>
+      </div>
 
-      <thead>
-        <tr class="th-group">
-          <th rowspan="2" class="left col-date">Department</th>
-          <th rowspan="2">Shift</th>
-          <th rowspan="2" style="min-width:80px;">Revised Required</th>
-          <th rowspan="2" style="min-width:80px;">On Roll</th>
-          <th colspan="4" class="grp-mc">Attendance</th>
-          <th rowspan="2">Day Off</th>
-          <th rowspan="2">Long Absent (&gt;4)</th>
-          <th rowspan="2">Turnover</th>
-          <th rowspan="2">Recruitment</th>
-          <th rowspan="2" style="min-width:80px;">Excess / (Short)</th>
-          <th rowspan="2" style="min-width:90px;border-left:2px solid #b0bec5;">
-            Absenteeism %<br>
-            <small style="font-weight:400;font-size:.65rem;">(dept level)</small>
-          </th>
-          <th rowspan="2">Turnover %</th>
-        </tr>
-        <tr class="th-sub">
-          <th>Present</th>
-          <th>Informed</th>
-          <th>Un-informed</th>
-          <th>Total Absent</th>
-        </tr>
-      </thead>
-      <tbody id="hrd-body">
-        <tr><td colspan="15" class="loading-cell">
-          Select a date and click Load.
-        </td></tr>
-      </tbody>
-      <tfoot id="hrd-foot"></tfoot>
-    </table>
-  </div>
-</div>
+      <!-- Single scroll wrapper — title + date + table all inside,
+           so the screenshot capture grabs everything together -->
+      <div class="table-scroll" id="hrd-wrap">
+        <table id="hrd-table">
+
+          <!-- Caption acts as the heading row inside the table
+               so it is always captured with the table -->
+          <caption style="text-align:left;padding:10px 10px 8px;
+                          border-bottom:2px solid #1a3a5c;margin-bottom:4px;
+                          caption-side:top;background:#fff;">
+            <div style="font-size:.95rem;font-weight:700;color:#1a3a5c;">
+              👥 Daily Attendance
+            </div>
+            <div id="hrd-asat" style="font-size:.78rem;color:#555;margin-top:3px;"></div>
+          </caption>
+
+          <thead>
+            <tr class="th-group">
+              <th rowspan="2" class="left col-date">Department</th>
+              <th rowspan="2">Shift</th>
+              <th rowspan="2" style="min-width:80px;">Revised Required</th>
+              <th rowspan="2" style="min-width:80px;">On Roll</th>
+              <th colspan="4" class="grp-mc">Attendance</th>
+              <th rowspan="2">Special Reason</th>
+              <th rowspan="2">Day Off</th>
+              <th rowspan="2">Long Absent (&gt;4)</th>
+              <th rowspan="2">Turnover</th>
+              <th rowspan="2">Recruitment</th>
+              <th rowspan="2" style="min-width:80px;">Excess / (Short)</th>
+              <th rowspan="2" style="min-width:90px;border-left:2px solid #b0bec5;">
+                Absenteeism %<br>
+                <small style="font-weight:400;font-size:.65rem;">(dept level)</small>
+              </th>
+              <th rowspan="2">Turnover %</th>
+            </tr>
+            <tr class="th-sub">
+              <th>Present</th>
+              <th>Informed</th>
+              <th>Un-informed</th>
+              <th>Total Absent</th>
+            </tr>
+          </thead>
+          <tbody id="hrd-body">
+            <tr><td colspan="16" class="loading-cell">
+              Select a date and click Load.
+            </td></tr>
+          </tbody>
+          <tfoot id="hrd-foot"></tfoot>
+        </table>
+      </div>
+    </div><!-- /card: HR attendance dashboard -->
 
   </div><!-- /container-wide -->
   </div><!-- /tab-dashboards -->
 
 
+  <!-- ════════════════════════════════════════════════════════
+       TAB 06 — ADMIN  (Transaction Data Manager)
+       Scope: ENTERED DATA ONLY — the day-to-day records that
+       get created through the other tabs (canteen entries,
+       manpower entries, OT entries, attendance entries, OT
+       plans, meal requests). This is where you go to find a
+       specific entered record, look at it field-by-field, fix
+       a mistake, or delete it outright.
+
+       Master/config data (Employee Register, Manpower Master
+       Rates, Cost Configuration, Attendance Carder Master,
+       Shift Roster) is intentionally NOT here — those already
+       have their own dedicated, safer management UI on the
+       "HR Master Data" tab, and mixing them in here would make
+       it too easy to break carder/rate setup by accident.
+
+       Each collection has its own row-summary columns (so you
+       can recognize a record at a glance) and its own field
+       editor (so editing stays structured instead of raw JSON)
+       — see ADMIN_COLLECTION_CONFIG in app.js.
+  ════════════════════════════════════════════════════════ -->
+  <div id="tab-admin" class="tab-content">
+  <div class="container-wide">
+
+    <!-- ── CARD: TRANSACTION DATA BROWSER ────────────────────────
+         Pick a data type → see every entered record as a table
+         → click a row to expand a field-by-field editor → Save
+         or Delete. No raw JSON for normal use; a JSON fallback
+         only appears for genuinely nested fields (e.g. an
+         array of rows inside one document).
+    ──────────────────────────────────────────────────────── -->
+    <div class="card">
+      <div class="card-title">🛠 Admin — Transaction Data Manager</div>
+
+      <p class="note" style="margin-bottom:14px;color:#a33;">
+        ⚠ This manages entered data only (not master/config data — edit those
+        on the HR Master Data tab). Saves overwrite the record immediately;
+        deletes are permanent. There is no undo.
+      </p>
+
+      <div class="form-grid-small" style="margin-bottom:14px;">
+        <div class="field">
+          <label>Data Type</label>
+          <!-- Options populated by populateAdminCollectionDropdown() in app.js
+               from ADMIN_COLLECTION_CONFIG (entered-data collections only) -->
+          <select id="admin-collection" onchange="loadAdminCollection()"></select>
+        </div>
+        <div class="field" style="grid-column: span 2;">
+          <label>Search (matches any visible column)</label>
+          <input type="text" id="admin-search" placeholder="Type to filter…"
+                 oninput="renderAdminDocs()"/>
+        </div>
+        <div class="field" style="justify-content:flex-end;">
+          <label>&nbsp;</label>
+          <button class="btn-apply" onclick="loadAdminCollection()">🔄 Refresh</button>
+        </div>
+      </div>
+
+      <div id="admin-status" style="margin-bottom:10px;font-size:.85rem;font-weight:600;"></div>
+
+      <!-- Summary table — rendered by renderAdminDocs(). Columns depend on the
+           selected collection's config. Clicking a row's Edit button opens an
+           inline field editor directly below that row. -->
+      <div class="table-scroll" style="max-height:560px;overflow-y:auto;">
+        <table id="admin-table">
+          <thead style="position:sticky;top:0;z-index:5;">
+            <tr class="th-sub" id="admin-table-head"></tr>
+          </thead>
+          <tbody id="admin-table-body">
+            <tr><td class="loading-cell">Select a data type above.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div><!-- /card: admin transaction data browser -->
+
+  </div><!-- /container-wide -->
+  </div><!-- /tab-admin -->
+
 </div><!-- /appContent -->
 
 
-<!-- ── TOAST NOTIFICATION ──────────────────────────────────────
+<!-- ── TOAST NOTIFICATION ───────────────────────────────────────
      Positioned bottom-right; shown by toast() in app.js.
      .show.ok  = green (success)
      .show.err = red   (error)
-─────────────────────────────────────────────────────────── -->
+──────────────────────────────────────────────────────────── -->
 <div id="toast"></div>
 
 <!-- App scripts — at the END of body, after all elements exist -->
-  <script src="js/firebase-config.js"></script>
-  <script src="js/app.js"></script>
+<script src="js/firebase-config.js"></script>
+<script src="js/app.js"></script>
 </body>
 </html>

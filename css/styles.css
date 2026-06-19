@@ -225,24 +225,45 @@ header {
 ════════════════════════════════════════════════════════════ */
 
 .tabs {
+  display: flex;
   flex-wrap: nowrap;
-  padding: 0 10px;
+  align-items: center;
+  gap: 4px;
+  padding: 0 14px;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   scroll-behavior: smooth;
   touch-action: pan-y;   /* let JS handle horizontal swipes, not the browser */
+  border-top: 1px solid rgba(255, 255, 255, .12);
 }
+
 .tab {
   flex: 0 0 auto;
-  padding: 10px 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 18px 11px;
   font-size: 13px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, .65);
+  background: transparent;
+  border: none;
+  border-bottom: 3px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  border-radius: 8px 8px 0 0;
+  transition: color .15s ease, background .15s ease;
 }
 
-.tab:hover { color: #fff; }
+.tab:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, .08);
+}
 
-/* Gold underline accent on the active tab */
+/* Gold underline + brighter background on the active tab */
 .tab.active {
   color:        #fff;
+  background:   rgba(255, 255, 255, .12);
   border-bottom-color: #f0a500;
 }
 
@@ -825,17 +846,17 @@ tfoot tr.grand-row td {
   /* Tabs scroll horizontally instead of wrapping/squeezing —
      each tab keeps its natural width and the strip scrolls */
   .tabs {
-     flex-wrap: nowrap;
-  padding: 0 10px;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  scroll-snap-type: x mandatory;   /* forces snap, not free scroll */
+    flex-wrap: nowrap;
+    padding: 0 10px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x mandatory;   /* forces snap, not free scroll */
   }
   .tab {
-   flex: 0 0 auto;
-  padding: 10px 16px;
-  font-size: 13px;
-  scroll-snap-align: start;        /* each tab is a snap point */
+    flex: 0 0 auto;
+    padding: 10px 16px;
+    font-size: 13px;
+    scroll-snap-align: start;        /* each tab is a snap point */
   }
 
   

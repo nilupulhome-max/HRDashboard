@@ -165,8 +165,21 @@ function switchTab(name, btn) {
   document.getElementById('tab-' + name).classList.add('active');
   btn.classList.add('active');
 
-  // Dashboard tab triggers a fresh data load on every visit
-  if (name === 'dashboard') loadDashboard();
+// Dashboards tab triggers a fresh data load on every visit
+// (was previously checking for 'dashboard' singular, which never
+// matched the real tab id 'dashboards' — so neither the main
+// canteen dashboard nor the HR attendance dashboard ever
+// auto-loaded; they only filled in after the user pressed Load)
+if (name === 'dashboards') {
+  loadDashboard();
+  loadHRDashboard();
+}
+
+  // Admin tab: (re)populate the collection dropdown and load its data
+  if (name === 'admin') {
+    populateAdminCollectionDropdown();
+    loadAdminCollection();
+  }
 
   // Keep the newly active tab visible inside the scrollable strip
   // (covers both click and the swipe handler below, which also
@@ -1763,13 +1776,14 @@ async function loadAttDaily() {
       const s   = savedMap[key] || {};
       attDailyRows[key] = {
         dept, shift,
-        present:     s.present     || 0,
-        informed:    s.informed    || 0,
-        uninformed:  s.uninformed  || 0,
-        dayoff:      s.dayoff      || 0,
-        longabsent:  s.longabsent  || 0,
-        turnover:    s.turnover    || 0,
-        recruitment: s.recruitment || 0,
+        present:       s.present       || 0,
+        informed:      s.informed      || 0,
+        uninformed:    s.uninformed    || 0,
+        specialReason: s.specialReason || 0,
+        dayoff:        s.dayoff        || 0,
+        longabsent:    s.longabsent    || 0,
+        turnover:      s.turnover      || 0,
+        recruitment:   s.recruitment   || 0,
       };
     });
 
@@ -1817,7 +1831,7 @@ function renderAttEntryTable() {
   // ── Step 3: Grand total accumulators ──────────────────────
   let GT = {
     revised:0, onRoll:0, present:0, informed:0, uninformed:0,
-    totalAbsent:0, dayoff:0, longabsent:0, turnover:0,
+    totalAbsent:0, specialReason:0, dayoff:0, longabsent:0, turnover:0,
     recruitment:0, excess:0
   };
 
@@ -1845,6 +1859,7 @@ function renderAttEntryTable() {
     GT.informed    += r.informed    || 0;
     GT.uninformed  += r.uninformed  || 0;
     GT.totalAbsent += totalAbsent;
+    GT.specialReason += r.specialReason || 0;
     GT.dayoff      += r.dayoff      || 0;
     GT.longabsent  += r.longabsent  || 0;
     GT.turnover    += r.turnover    || 0;
@@ -1900,6 +1915,7 @@ function renderAttEntryTable() {
       <td style="padding:4px 5px;">${inp('informed',    r.informed    || 0)}</td>
       <td style="padding:4px 5px;">${inp('uninformed',  r.uninformed  || 0)}</td>
       <td style="padding:5px 8px;text-align:center;font-weight:700;">${totalAbsent || '—'}</td>
+      <td style="padding:4px 5px;">${inp('specialReason', r.specialReason || 0)}</td>
       <td style="padding:4px 5px;">${inp('dayoff',      r.dayoff      || 0)}</td>
       <td style="padding:4px 5px;">${inp('longabsent',  r.longabsent  || 0)}</td>
       <td style="padding:4px 5px;">${inp('turnover',    r.turnover    || 0)}</td>
@@ -1928,6 +1944,7 @@ function renderAttEntryTable() {
     <td style="padding:7px 8px;text-align:center;">${GT.informed}</td>
     <td style="padding:7px 8px;text-align:center;">${GT.uninformed}</td>
     <td style="padding:7px 8px;text-align:center;">${GT.totalAbsent}</td>
+    <td style="padding:7px 8px;text-align:center;">${GT.specialReason}</td>
     <td style="padding:7px 8px;text-align:center;">${GT.dayoff}</td>
     <td style="padding:7px 8px;text-align:center;">${GT.longabsent}</td>
     <td style="padding:7px 8px;text-align:center;">${GT.turnover}</td>
@@ -1958,15 +1975,16 @@ async function saveAttDaily() {
     const r      = attDailyRows[key] || {};
     const master = attMasters[key]   || { revised: 0, onRoll: 0 };
 
-    const present     = r.present     || 0;
-    const informed    = r.informed    || 0;
-    const uninformed  = r.uninformed  || 0;
-    const dayoff      = r.dayoff      || 0;
-    const longabsent  = r.longabsent  || 0;
-    const turnover    = r.turnover    || 0;
-    const recruitment = r.recruitment || 0;
-    const revised     = master.revised || 0;
-    const onRoll      = master.onRoll  || 0;
+    const present       = r.present       || 0;
+    const informed      = r.informed      || 0;
+    const uninformed    = r.uninformed    || 0;
+    const specialReason = r.specialReason || 0;   // entered only — not used in any formula
+    const dayoff        = r.dayoff        || 0;
+    const longabsent    = r.longabsent    || 0;
+    const turnover      = r.turnover      || 0;
+    const recruitment   = r.recruitment   || 0;
+    const revised       = master.revised  || 0;
+    const onRoll        = master.onRoll   || 0;
 
     const totalAbsent  = informed + uninformed;
     const excess       = onRoll - revised;
@@ -1974,7 +1992,7 @@ async function saveAttDaily() {
 
     return {
       dept, shift, revised, onRoll,
-      present, informed, uninformed, dayoff,
+      present, informed, uninformed, specialReason, dayoff,
       longabsent, turnover, recruitment,
       totalAbsent, excess, turnoverPct
     };
@@ -3078,13 +3096,14 @@ async function loadHRDashboard() {
       const key = `${dept}_${shift}`;
       const s   = savedMap[key] || {};
       rows[key] = {
-        present:     s.present     || 0,
-        informed:    s.informed    || 0,
-        uninformed:  s.uninformed  || 0,
-        dayoff:      s.dayoff      || 0,
-        longabsent:  s.longabsent  || 0,
-        turnover:    s.turnover    || 0,
-        recruitment: s.recruitment || 0,
+        present:       s.present       || 0,
+        informed:      s.informed      || 0,
+        uninformed:    s.uninformed    || 0,
+        specialReason: s.specialReason || 0,
+        dayoff:        s.dayoff        || 0,
+        longabsent:    s.longabsent    || 0,
+        turnover:      s.turnover      || 0,
+        recruitment:   s.recruitment   || 0,
       };
     });
 
@@ -3138,7 +3157,7 @@ function renderHRDashTable(rowData) {
   // ── Step 2: Grand total accumulators ──────────────────────
   let GT = {
     revised:0, onRoll:0, present:0, informed:0, uninformed:0,
-    totalAbsent:0, dayoff:0, longabsent:0, turnover:0,
+    totalAbsent:0, specialReason:0, dayoff:0, longabsent:0, turnover:0,
     recruitment:0, excess:0
   };
 
@@ -3164,6 +3183,7 @@ function renderHRDashTable(rowData) {
     GT.informed    += r.informed    || 0;
     GT.uninformed  += r.uninformed  || 0;
     GT.totalAbsent += totalAbsent;
+    GT.specialReason += r.specialReason || 0;
     GT.dayoff      += r.dayoff      || 0;
     GT.longabsent  += r.longabsent  || 0;
     GT.turnover    += r.turnover    || 0;
@@ -3220,6 +3240,7 @@ function renderHRDashTable(rowData) {
       ${c(r.informed,       '')}
       ${c(r.uninformed,     '')}
       ${c(totalAbsent,      'font-weight:700;')}
+      ${c(r.specialReason,  '')}
       ${c(r.dayoff,         '')}
       ${c(r.longabsent,     '')}
       ${c(r.turnover,       '')}
@@ -3254,6 +3275,7 @@ function renderHRDashTable(rowData) {
     <td style="padding:7px 8px;text-align:center;">${GT.informed}</td>
     <td style="padding:7px 8px;text-align:center;">${GT.uninformed}</td>
     <td style="padding:7px 8px;text-align:center;">${GT.totalAbsent}</td>
+    <td style="padding:7px 8px;text-align:center;">${GT.specialReason}</td>
     <td style="padding:7px 8px;text-align:center;">${GT.dayoff}</td>
     <td style="padding:7px 8px;text-align:center;">${GT.longabsent}</td>
     <td style="padding:7px 8px;text-align:center;">${GT.turnover}</td>
@@ -4612,3 +4634,374 @@ async function issueMeal(docId, label) {
   }).join('');
 }
   ═══════════════════════════════════════════════════════════ */
+
+// ════════════════════════════════════════════════════════════
+//  26. ADMIN — TRANSACTION DATA MANAGER
+//  Scope: ENTERED DATA ONLY. Master/config collections
+//  (employees, attendance_masters, manpower_rates, config,
+//  shift_roster) are deliberately excluded — they already have
+//  dedicated, safer forms on the HR Master Data tab.
+//
+//  For each entered-data collection we define:
+//    label     - shown in the Data Type dropdown
+//    columns   - [{ key, label }] shown in the summary table
+//                (key may be a dotted path for nested values)
+//    fields    - [{ key, label, type }] shown in the row editor
+//                type: 'text' | 'number' | 'date' | 'json'
+//                ('json' is the fallback for nested objects/
+//                arrays, e.g. a document that stores an array
+//                of rows — edited as a JSON sub-field, not the
+//                whole document)
+//
+//  This keeps editing structured (plain inputs) for the normal
+//  case, while still allowing any field — including nested ones
+//  — to be reached without hard-coding a UI for every possible
+//  shape.
+// ════════════════════════════════════════════════════════════
+
+const ADMIN_COLLECTION_CONFIG = {
+
+  records: {
+    label: 'Canteen Shift Entries (records)',
+    columns: [
+      { key: 'date',     label: 'Date' },
+      { key: 'shift',    label: 'Shift' },
+      { key: 'supplier', label: 'Supplier' }
+    ],
+    fields: [
+      { key: 'date',         label: 'Date',          type: 'date' },
+      { key: 'shift',        label: 'Shift',         type: 'text' },
+      { key: 'suppliers',    label: 'Suppliers (object)', type: 'json' },
+      { key: 'mpEntry',      label: 'Manpower Entry (object)', type: 'json' },
+      { key: 'otEntry',      label: 'OT Entry (object)', type: 'json' }
+    ]
+  },
+
+  manpower_entries: {
+    label: 'Daily Manpower Entries',
+    columns: [
+      { key: 'date',      label: 'Date' },
+      { key: 'totalCost', label: 'Total Cost' }
+    ],
+    fields: [
+      { key: 'date',      label: 'Date',                 type: 'date' },
+      { key: 'totalCost', label: 'Total Cost (Rs)',      type: 'number' },
+      { key: 'rows',      label: 'Rows (array)',         type: 'json' }
+    ]
+  },
+
+  ot_entries: {
+    label: 'Daily OT Cost Entries',
+    columns: [
+      { key: 'date',       label: 'Date' },
+      { key: 'dayHours',   label: 'DAY Hrs' },
+      { key: 'nightHours', label: 'NIGHT Hrs' }
+    ],
+    fields: [
+      { key: 'date',       label: 'Date',           type: 'date'   },
+      { key: 'dayHours',   label: 'DAY Hours',      type: 'number' },
+      { key: 'dayCost',    label: 'DAY Cost (Rs)',  type: 'number' },
+      { key: 'nightHours', label: 'NIGHT Hours',    type: 'number' },
+      { key: 'nightCost',  label: 'NIGHT Cost (Rs)',type: 'number' }
+    ]
+  },
+
+  attendance_daily: {
+    label: 'Daily Attendance Entries',
+    columns: [
+      { key: 'date', label: 'Date' }
+    ],
+    fields: [
+      { key: 'date', label: 'Date',         type: 'date' },
+      { key: 'rows', label: 'Rows (array)', type: 'json' }
+    ]
+  },
+
+  ot_daily: {
+    label: 'OT Daily Entries (Pre-Approval & Actual)',
+    columns: [
+      { key: 'date', label: 'Date' }
+    ],
+    fields: [
+      { key: 'date', label: 'Date',         type: 'date' },
+      { key: 'rows', label: 'Rows (array)', type: 'json' }
+    ]
+  },
+
+  ot_plans: {
+    label: 'OT Plan — Monthly Setup',
+    columns: [
+      { key: 'month', label: 'Month' }
+    ],
+    fields: [
+      { key: 'month',    label: 'Month (YYYY-MM)',  type: 'text' },
+      { key: 'rows',     label: 'Rows (array)',     type: 'json' },
+      { key: 'holidays', label: 'Holidays (array)', type: 'json' }
+    ]
+  },
+
+  meal_requests: {
+    label: 'Meal Requests',
+    columns: [
+      { key: 'epfNo',       label: 'EPF No' },
+      { key: 'name',        label: 'Name' },
+      { key: 'mealType',    label: 'Meal' },
+      { key: 'forDate',     label: 'For Date' },
+      { key: 'status',      label: 'Status' },
+      { key: 'requestedAt', label: 'Requested At' }
+    ],
+    fields: [
+      { key: 'epfNo',       label: 'EPF No',       type: 'text' },
+      { key: 'name',        label: 'Name',         type: 'text' },
+      { key: 'dept',        label: 'Department',   type: 'text' },
+      { key: 'mealType',    label: 'Meal Type',    type: 'text' },
+      { key: 'forDate',     label: 'For Date',     type: 'date' },
+      { key: 'status',      label: 'Status (Pending/Issued/Missed)', type: 'text' },
+      { key: 'requestedAt', label: 'Requested At (ISO)', type: 'text' },
+      { key: 'issuedAt',    label: 'Issued At (ISO)',    type: 'text' }
+    ]
+  }
+};
+
+// Cache of the currently-loaded collection's docs (id + data),
+// so search/filter and "expand row" can work without refetching.
+let adminDocsCache = [];
+
+// Tracks which doc ID currently has its editor panel open, so
+// re-rendering the table (e.g. after a search keystroke) can
+// keep it open instead of collapsing it.
+let adminOpenDocId = null;
+
+// ── populateAdminCollectionDropdown ─────────────────────────
+// Fills the Data Type <select> from ADMIN_COLLECTION_CONFIG.
+// Re-running it is safe — keeps the current selection if valid.
+function populateAdminCollectionDropdown() {
+  const sel = document.getElementById('admin-collection');
+  if (!sel) return;
+  const prevValue = sel.value;
+
+  sel.innerHTML = Object.entries(ADMIN_COLLECTION_CONFIG)
+    .map(([key, cfg]) => `<option value="${key}">${cfg.label}</option>`)
+    .join('');
+
+  if (prevValue && ADMIN_COLLECTION_CONFIG[prevValue]) {
+    sel.value = prevValue;
+  }
+}
+
+// ── adminGetPath ─────────────────────────────────────────────
+// Reads a (possibly dotted) path out of an object, e.g.
+// adminGetPath(data, 'suppliers.Nilu.lunchQty').
+function adminGetPath(obj, path) {
+  return path.split('.').reduce((o, k) => (o && o[k] !== undefined ? o[k] : ''), obj);
+}
+
+// ── loadAdminCollection ──────────────────────────────────────
+// Fetches every document in the selected collection, caches it,
+// and renders the summary table.
+async function loadAdminCollection() {
+  const col = document.getElementById('admin-collection')?.value;
+  const statusEl = document.getElementById('admin-status');
+  if (!col || !ADMIN_COLLECTION_CONFIG[col]) return;
+
+  adminOpenDocId = null;
+  statusEl.textContent = '⏳ Loading…';
+  statusEl.style.color = '#5a6e84';
+
+  try {
+    const snap = await db.collection(col).get();
+    adminDocsCache = snap.docs
+      .map(d => ({ id: d.id, data: d.data() }))
+      .sort((a, b) => a.id.localeCompare(b.id));
+
+    statusEl.textContent = `✔ ${adminDocsCache.length} record(s)`;
+    statusEl.style.color = '#1e8449';
+    renderAdminDocs();
+  } catch (e) {
+    console.error('loadAdminCollection:', e);
+    statusEl.textContent = 'Error loading data: ' + e.message;
+    statusEl.style.color = '#c0392b';
+    adminDocsCache = [];
+    renderAdminDocs();
+  }
+}
+
+// ── renderAdminDocs ──────────────────────────────────────────
+// Renders the summary table for the selected collection,
+// filtered by the search box (matches against any visible
+// column's text). The currently-open row (adminOpenDocId), if
+// any, gets its field editor expanded directly under it.
+function renderAdminDocs() {
+  const col = document.getElementById('admin-collection')?.value;
+  const cfg = ADMIN_COLLECTION_CONFIG[col];
+  const headEl = document.getElementById('admin-table-head');
+  const bodyEl = document.getElementById('admin-table-body');
+  if (!cfg || !headEl || !bodyEl) return;
+
+  // ── Header row ──
+  headEl.innerHTML =
+    `<th class="left" style="padding:8px 10px;">Doc ID</th>` +
+    cfg.columns.map(c => `<th style="padding:8px 10px;">${c.label}</th>`).join('') +
+    `<th style="padding:8px 10px;">Actions</th>`;
+
+  // ── Filter by search term across doc ID + visible columns ──
+  const term = (document.getElementById('admin-search')?.value || '').trim().toLowerCase();
+  const docs = !term ? adminDocsCache : adminDocsCache.filter(d => {
+    const haystack = [d.id, ...cfg.columns.map(c => adminGetPath(d.data, c.key))]
+      .join(' ').toLowerCase();
+    return haystack.includes(term);
+  });
+
+  if (!docs.length) {
+    bodyEl.innerHTML = `<tr><td colspan="${cfg.columns.length + 2}" class="loading-cell">
+      No records found.
+    </td></tr>`;
+    return;
+  }
+
+  bodyEl.innerHTML = docs.map(d => {
+    const safeId = d.id.replace(/'/g, "\\'");
+    const cells = cfg.columns
+      .map(c => `<td style="padding:8px 10px;">${adminGetPath(d.data, c.key) ?? ''}</td>`)
+      .join('');
+
+    const rowHtml = `
+      <tr>
+        <td class="left" style="padding:8px 10px;font-weight:600;">${d.id}</td>
+        ${cells}
+        <td style="padding:8px 10px;white-space:nowrap;">
+          <button class="btn-clear" onclick="toggleAdminEditor('${safeId}')">
+            ${adminOpenDocId === d.id ? '▲ Close' : '✎ Edit'}
+          </button>
+          <button class="btn-delete" onclick="deleteAdminDoc('${safeId}')">🗑</button>
+        </td>
+      </tr>`;
+
+    if (adminOpenDocId !== d.id) return rowHtml;
+
+    // ── Expanded field editor row ──
+    const fieldsHtml = cfg.fields.map(f => {
+      const raw = adminGetPath(d.data, f.key);
+      const inputId = `admin-f-${f.key.replace(/\./g, '_')}`;
+
+      if (f.type === 'json') {
+        const json = JSON.stringify(raw ?? null, null, 2).replace(/</g, '&lt;');
+        return `
+          <div style="grid-column:1/-1;">
+            <label style="font-size:.78rem;font-weight:600;color:#5a6e84;display:block;margin-bottom:4px;">
+              ${f.label}
+            </label>
+            <textarea id="${inputId}" rows="5" spellcheck="false"
+                      style="width:100%;font-family:monospace;font-size:.78rem;
+                             padding:8px;border:1px solid #d6dce4;border-radius:6px;
+                             box-sizing:border-box;">${json}</textarea>
+          </div>`;
+      }
+
+      const inputType = f.type === 'number' ? 'number' : (f.type === 'date' ? 'date' : 'text');
+      const val = (raw === undefined || raw === null) ? '' : raw;
+      return `
+        <div class="field">
+          <label>${f.label}</label>
+          <input type="${inputType}" id="${inputId}" value="${String(val).replace(/"/g, '&quot;')}"/>
+        </div>`;
+    }).join('');
+
+    return rowHtml + `
+      <tr>
+        <td colspan="${cfg.columns.length + 2}" style="background:#fafbfc;padding:14px;">
+          <div class="form-grid-small" style="margin-bottom:10px;">${fieldsHtml}</div>
+          <div class="form-actions">
+            <button class="btn-save" onclick="saveAdminDoc('${safeId}')">💾 Save Changes</button>
+            <span class="save-status" id="admin-edit-status"></span>
+          </div>
+        </td>
+      </tr>`;
+  }).join('');
+}
+
+// ── toggleAdminEditor ─────────────────────────────────────────
+// Opens/closes the inline field editor for one row.
+function toggleAdminEditor(docId) {
+  adminOpenDocId = (adminOpenDocId === docId) ? null : docId;
+  renderAdminDocs();
+}
+
+// ── saveAdminDoc ─────────────────────────────────────────────
+// Reads every field input/textarea for the currently-open row,
+// rebuilds the field values onto the cached document object
+// (so untouched nested data is preserved), and writes the
+// FULL resulting object back with set().
+async function saveAdminDoc(docId) {
+  const col = document.getElementById('admin-collection')?.value;
+  const cfg = ADMIN_COLLECTION_CONFIG[col];
+  const cached = adminDocsCache.find(d => d.id === docId);
+  if (!cfg || !cached) return;
+
+  // Start from the existing data so fields not in the editor
+  // (if any are added to the schema later) aren't lost.
+  const updated = JSON.parse(JSON.stringify(cached.data));
+
+  for (const f of cfg.fields) {
+    const inputId = `admin-f-${f.key.replace(/\./g, '_')}`;
+    const el = document.getElementById(inputId);
+    if (!el) continue;
+
+    let value;
+    if (f.type === 'json') {
+      try {
+        value = JSON.parse(el.value);
+      } catch (e) {
+        toast(`Invalid JSON in "${f.label}": ${e.message}`, true);
+        return;
+      }
+    } else if (f.type === 'number') {
+      value = el.value === '' ? null : Number(el.value);
+    } else {
+      value = el.value;
+    }
+
+    // Support dotted keys (e.g. "suppliers.Nilu.lunchQty") by
+    // writing into the right nested spot rather than overwriting
+    // the whole parent object.
+    const parts = f.key.split('.');
+    let target = updated;
+    for (let i = 0; i < parts.length - 1; i++) {
+      if (typeof target[parts[i]] !== 'object' || target[parts[i]] === null) {
+        target[parts[i]] = {};
+      }
+      target = target[parts[i]];
+    }
+    target[parts[parts.length - 1]] = value;
+  }
+
+  if (!confirm(`Save changes to "${docId}"? This overwrites the record immediately.`)) return;
+
+  try {
+    await db.collection(col).doc(docId).set(updated);
+    toast('✔ Saved ' + docId);
+    adminOpenDocId = null;
+    await loadAdminCollection();
+  } catch (e) {
+    console.error('saveAdminDoc:', e);
+    toast('Save error: ' + e.message, true);
+  }
+}
+
+// ── deleteAdminDoc ───────────────────────────────────────────
+// Permanently deletes one entered-data record. Confirms first —
+// there is no undo once this runs.
+async function deleteAdminDoc(docId) {
+  const col = document.getElementById('admin-collection')?.value;
+  if (!confirm(`Permanently delete "${docId}"? This cannot be undone.`)) return;
+
+  try {
+    await db.collection(col).doc(docId).delete();
+    toast('🗑 Deleted ' + docId);
+    if (adminOpenDocId === docId) adminOpenDocId = null;
+    await loadAdminCollection();
+  } catch (e) {
+    console.error('deleteAdminDoc:', e);
+    toast('Delete error: ' + e.message, true);
+  }
+}
