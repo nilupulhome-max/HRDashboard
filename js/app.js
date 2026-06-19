@@ -91,6 +91,8 @@ auth.onAuthStateChanged(user => {
       // ── Masters ──────────────────────────────────────────
       await loadMpRates();
       await loadAttMasters();
+      await loadShiftRoster();
+      await loadEmployees();
 
       // ── Daily entries (today) ────────────────────────────
       loadMpEntry();
@@ -98,6 +100,8 @@ auth.onAuthStateChanged(user => {
       initAttDailyDate();   // sets today + loads attendance entry
       initOTPlan();         // sets current month in OT plan picker
       initOTDaily();        // sets today in OT daily picker
+      initMealRequestLog();
+      updateActiveSlotBanner();
 
       // ── Auto-load all dashboards for today ───────────────
       const now = new Date();
@@ -1513,6 +1517,7 @@ const ATT_DEPTS = [
   { dept: 'ERP',             shift: 'Shift B'  },
   { dept: 'Marketing',       shift: 'General'  },
   { dept: 'HR',              shift: 'General'  },
+  { dept: 'Staff',           shift: 'General'  },   // ← added
 ];
 
 let attMasters    = {};
@@ -2060,6 +2065,45 @@ function dayType(date) {
 function dateKey(date) {
   const pad = n => String(n).padStart(2, '0');
   return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}`;
+}
+
+// ── getShiftDate ──────────────────────────────────────────────
+// Returns the correct "shift date" for reporting purposes.
+//
+// RULE: Night shift runs 7pm → 7am, crossing midnight into the
+// next calendar day. Everything that happens during that whole
+// shift — including early-morning teas at 12am-1am and 4am-5am —
+// must be reported under the date the shift STARTED, not the
+// calendar date it physically occurred on.
+//
+// For Day and General shifts, shiftDate always equals the
+// normal calendar date (no adjustment needed).
+//
+// Logic: if it's currently between midnight (00:00) and 7:00am,
+// and the employee resolves to Night shift, roll the date back
+// by one day. Otherwise, use today's date as-is.
+function getShiftDate(empOrShiftCode, now) {
+  const hour = now.getHours();
+
+  // Resolve the employee's actual shift for "now" first using
+  // today's calendar date (shift assignment doesn't change due
+  // to the early-morning rollback — only the REPORTING date does)
+  const shiftCode = typeof empOrShiftCode === 'string'
+    ? empOrShiftCode
+    : empOrShiftCode.shiftCode;
+
+  const actualShift = resolveActualShift(shiftCode, now);
+
+  if (actualShift === 'Night' && hour < 7) {
+    // Early morning hours of a Night shift — roll back to
+    // the date the shift actually started (yesterday)
+    const shiftStartDate = new Date(now);
+    shiftStartDate.setDate(now.getDate() - 1);
+    return dateKey(shiftStartDate);
+  }
+
+  // Day, General, or Night shift after 7am — use today as-is
+  return dateKey(now);
 }
 
 // ── getDeptOTHours ───────────────────────────────────────────
@@ -3166,4 +3210,1285 @@ async function exportHRDashImage() {
   link.href     = canvas.toDataURL('image/png');
   link.click();
   toast('Captured!');
+}
+
+// ════════════════════════════════════════════════════════════
+//  MEAL SYSTEM — STEP 1A: SHIFT ROSTER (rotation engine)
+//  Firestore collection : shift_roster
+//  Document ID          : "current"  (single document)
+//
+//  Concept:
+//    HR sets ONE anchor date — any Monday where Shift A is
+//    known to be on DAY shift. From that single reference
+//    point, the system calculates which shift (Day/Night)
+//    Shift A and Shift B are on for ANY given date, forever,
+//    by counting how many full weeks have passed since the
+//    anchor and checking odd/even.
+//
+//    Even weeks since anchor → Shift A = DAY,   Shift B = NIGHT
+//    Odd  weeks since anchor → Shift A = NIGHT, Shift B = DAY
+//    General is never affected — always General/Day-window.
+// ════════════════════════════════════════════════════════════
+
+// In-memory roster anchor — loaded once at login
+let shiftRosterAnchor = null;   // Date object
+
+// ── loadShiftRoster ──────────────────────────────────────────
+// Fetches the saved anchor date from Firestore. If none exists
+// yet, leaves the field blank for HR to set up for the first time.
+async function loadShiftRoster() {
+  try {
+    const doc = await db.collection('shift_roster').doc('current').get();
+    if (doc.exists) {
+      const data = doc.data();
+      shiftRosterAnchor = new Date(data.anchorDate + 'T00:00:00');
+      document.getElementById('roster-anchor-date').value = data.anchorDate;
+    }
+    updateRosterStatusDisplay();
+  } catch (e) {
+    console.error('loadShiftRoster:', e);
+  }
+}
+
+// ── saveShiftRoster ──────────────────────────────────────────
+// Saves the anchor date HR has chosen. This date MUST be a
+// Monday where Shift A is confirmed to be on DAY shift.
+async function saveShiftRoster() {
+  const dateStr = document.getElementById('roster-anchor-date').value;
+  if (!dateStr) { toast('Select an anchor date', true); return; }
+
+  // Validate it's a Monday (dayOfWeek 1) — warn but allow override
+  const d = new Date(dateStr + 'T00:00:00');
+  if (d.getDay() !== 1) {
+    if (!confirm('Selected date is not a Monday. Continue anyway?')) return;
+  }
+
+  try {
+    await db.collection('shift_roster').doc('current').set({
+      anchorDate: dateStr,
+      savedAt:    new Date().toISOString()
+    });
+
+    shiftRosterAnchor = d;
+    updateRosterStatusDisplay();
+
+    document.getElementById('roster-status').textContent = '✔ Saved!';
+    setTimeout(() => document.getElementById('roster-status').textContent = '', 3000);
+    toast('Shift roster anchor saved!');
+  } catch (e) {
+    toast('Save error: ' + e.message, true);
+  }
+}
+
+// ── getShiftAssignment ────────────────────────────────────────
+// THE CORE ROTATION FUNCTION.
+// Given any JS Date, returns which actual shift (Day/Night)
+// Shift A and Shift B are assigned to for that date's week.
+//
+// Returns: { A: 'Day'|'Night', B: 'Day'|'Night' }
+//
+// Math: count full 7-day periods between the anchor Monday
+// and the target date. Even count = A is Day. Odd = A is Night.
+function getShiftAssignment(targetDate) {
+  if (!shiftRosterAnchor) {
+    // No anchor set yet — default safe fallback
+    return { A: 'Day', B: 'Night' };
+  }
+
+  // Normalise both dates to midnight to avoid time-of-day drift
+  const anchor = new Date(shiftRosterAnchor);
+  anchor.setHours(0, 0, 0, 0);
+  const target = new Date(targetDate);
+  target.setHours(0, 0, 0, 0);
+
+  // Find the Monday of the target date's week
+  // (so any day within a week maps to the same week-count)
+  const targetDay     = target.getDay();              // 0=Sun..6=Sat
+  const daysFromMonday = targetDay === 0 ? 6 : targetDay - 1;
+  const targetMonday  = new Date(target);
+  targetMonday.setDate(target.getDate() - daysFromMonday);
+
+  // Difference in days between anchor Monday and target Monday
+  const msPerDay   = 24 * 60 * 60 * 1000;
+  const diffDays   = Math.round((targetMonday - anchor) / msPerDay);
+  const weeksSince = Math.floor(diffDays / 7);
+
+  // Even weeks → A=Day, B=Night. Odd weeks → A=Night, B=Day.
+  // Handles negative weeksSince (dates before anchor) correctly
+  // using a safe modulo that always returns 0 or 1.
+  const isEvenWeek = (((weeksSince % 2) + 2) % 2) === 0;
+
+  return isEvenWeek
+    ? { A: 'Day',   B: 'Night' }
+    : { A: 'Night', B: 'Day'   };
+}
+
+// ── resolveActualShift ──────────────────────────────────────
+// Converts an employee's fixed Shift Code (A/B/General) into
+// their ACTUAL Day/Night assignment for a specific date.
+// General always resolves to "General" (its own fixed window).
+function resolveActualShift(shiftCode, targetDate) {
+  if (shiftCode === 'General') return 'General';
+  const assignment = getShiftAssignment(targetDate);
+  return assignment[shiftCode];   // 'A' or 'B' → 'Day' or 'Night'
+}
+
+// ── updateRosterStatusDisplay ────────────────────────────────
+// Shows HR a human-readable summary of the CURRENT week's
+// rotation status, calculated live from the anchor date.
+function updateRosterStatusDisplay() {
+  const el = document.getElementById('roster-current-status');
+  if (!shiftRosterAnchor) {
+    el.value = 'Not set — select an anchor date';
+    return;
+  }
+  const today      = new Date();
+  const assignment = getShiftAssignment(today);
+  el.value = `This week: Shift A = ${assignment.A}, Shift B = ${assignment.B}`;
+}
+
+
+// ════════════════════════════════════════════════════════════
+//  MEAL SYSTEM — STEP 1B: EMPLOYEE REGISTER
+//  Firestore collection : employees
+//  Document ID          : EPF No (e.g. "EPF1234")
+//
+//  This is the master list of every employee eligible for
+//  meals. Department list reuses the same fixed dept names
+//  used elsewhere in the system (ATT_DEPTS) for consistency.
+// ════════════════════════════════════════════════════════════
+
+// In-memory cache of all employees — keyed by EPF No
+let employees = {};
+
+// Tracks which EPF No is being edited (null = new record mode)
+let employeeEditId = null;
+
+// ── loadEmployees ─────────────────────────────────────────────
+// Fetches all employee documents and populates both the
+// in-memory cache and the Department dropdown (reusing the
+// fixed dept list from ATT_DEPTS for consistency across modules).
+async function loadEmployees() {
+  try {
+    // Populate department dropdown from the same fixed list
+    // used in Attendance/OT modules — keeps dept names consistent
+    const deptSelect   = document.getElementById('emp-dept');
+    const uniqueDepts  = [...new Set(ATT_DEPTS.map(d => d.dept))];
+    deptSelect.innerHTML = '<option value="">— select —</option>' +
+      uniqueDepts.map(d => `<option value="${d}">${d}</option>`).join('');
+
+    // Fetch all employees
+    const snap = await db.collection('employees').orderBy('name').get();
+    employees  = {};
+    snap.forEach(d => { employees[d.id] = d.data(); });
+
+    renderEmployeeTable();
+  } catch (e) {
+    console.error('loadEmployees:', e);
+    toast('Error loading employees: ' + e.message, true);
+  }
+}
+
+// ── saveEmployee ──────────────────────────────────────────────
+// Validates the form, then creates a new employee document
+// (keyed by EPF No) or updates an existing one if in edit mode.
+async function saveEmployee() {
+  const epfNo = document.getElementById('emp-epfno').value.trim();
+  const name  = document.getElementById('emp-name').value.trim();
+  const dept  = document.getElementById('emp-dept').value;
+  const shiftCode = document.getElementById('emp-shiftcode').value;
+  const type  = document.getElementById('emp-type').value;
+
+  if (!epfNo || !name || !dept) {
+    toast('Enter EPF No, Name and Department', true);
+    return;
+  }
+
+  // Block duplicate EPF No when creating a NEW employee
+  // (editing keeps the same ID so this check is skipped then)
+  if (!employeeEditId && employees[epfNo]) {
+    toast(`EPF No "${epfNo}" already exists. Use Edit to update it.`, true);
+    return;
+  }
+
+  const payload = {
+    epfNo, name, dept, shiftCode, type,
+    active:  true,
+    savedAt: new Date().toISOString()
+  };
+
+  try {
+    // Document ID is always the EPF No — simple, guaranteed unique
+    await db.collection('employees').doc(epfNo).set(payload);
+
+    await loadEmployees();
+    resetEmployeeForm();
+
+    document.getElementById('emp-status').textContent = '✔ Saved!';
+    setTimeout(() => document.getElementById('emp-status').textContent = '', 3000);
+    toast(employeeEditId ? 'Employee updated!' : 'Employee added!');
+  } catch (e) {
+    toast('Save error: ' + e.message, true);
+  }
+}
+
+// ── editEmployee ──────────────────────────────────────────────
+// Pre-fills the form with an existing employee's details so
+// HR can update them. EPF No field is locked during edit since
+// it's the permanent document ID.
+function editEmployee(epfNo) {
+  const emp = employees[epfNo];
+  if (!emp) return;
+
+  employeeEditId = epfNo;
+
+  document.getElementById('emp-epfno').value     = emp.epfNo;
+  document.getElementById('emp-epfno').readOnly  = true;   // lock ID field during edit
+  document.getElementById('emp-name').value      = emp.name;
+  document.getElementById('emp-dept').value      = emp.dept;
+  document.getElementById('emp-shiftcode').value = emp.shiftCode;
+  document.getElementById('emp-type').value      = emp.type;
+
+  document.getElementById('emp-save-btn').textContent     = '💾 Update Employee';
+  document.getElementById('emp-cancel-btn').style.display = '';
+
+  document.getElementById('emp-epfno').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// ── cancelEmployeeEdit ───────────────────────────────────────
+function cancelEmployeeEdit() {
+  resetEmployeeForm();
+  toast('Edit cancelled.');
+}
+
+// ── deleteEmployee ────────────────────────────────────────────
+// Permanently removes an employee record after confirmation.
+async function deleteEmployee(epfNo) {
+  const emp = employees[epfNo];
+  if (!emp) return;
+
+  if (!confirm(`Delete employee "${emp.name}" (${epfNo})?\n\nThis cannot be undone.`)) return;
+
+  try {
+    await db.collection('employees').doc(epfNo).delete();
+    await loadEmployees();
+    toast('Employee deleted!');
+  } catch (e) {
+    toast('Delete error: ' + e.message, true);
+  }
+}
+
+// ── renderEmployeeTable ──────────────────────────────────────
+// Renders the employee list, filtered by the search box if
+// the user has typed anything (matches name or EPF No, case-
+// insensitive, partial match).
+// ── Pagination state for employee table ─────────────────────
+let emp_currentPage = 1;
+
+// ── empGoToPage ───────────────────────────────────────────────
+// Changes the current page and re-renders, clamping within
+// valid bounds (handled inside renderEmployeeTable itself).
+function empGoToPage(page) {
+  emp_currentPage = page;
+  renderEmployeeTable();
+}
+
+// ── renderEmployeeTable ──────────────────────────────────────
+// Renders a paginated, searchable view of the employee list.
+// Search matches name or EPF No (case-insensitive, partial).
+// Page size is controlled by the dropdown (default 15 rows).
+function renderEmployeeTable() {
+  const tbody      = document.getElementById('emp-table-body');
+  const searchTerm = (document.getElementById('emp-search')?.value || '').toLowerCase().trim();
+  const pageSize   = parseInt(document.getElementById('emp-page-size')?.value || 15);
+
+  let list = Object.values(employees);
+
+  // Apply search filter
+  if (searchTerm) {
+    list = list.filter(e =>
+      e.name.toLowerCase().includes(searchTerm) ||
+      e.epfNo.toLowerCase().includes(searchTerm)
+    );
+  }
+
+  // Sort alphabetically by name
+  list.sort((a, b) => a.name.localeCompare(b.name));
+
+  const totalRows  = list.length;
+  const totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
+
+  // Clamp current page within valid range
+  if (emp_currentPage > totalPages) emp_currentPage = totalPages;
+  if (emp_currentPage < 1)          emp_currentPage = 1;
+
+  // Slice to current page only
+  const startIdx = (emp_currentPage - 1) * pageSize;
+  const pageList = list.slice(startIdx, startIdx + pageSize);
+
+  if (!pageList.length) {
+    tbody.innerHTML = '<tr><td colspan="6" class="loading-cell">No employees found.</td></tr>';
+    document.getElementById('emp-page-info').textContent = '0 results';
+    return;
+  }
+
+  tbody.innerHTML = pageList.map(emp => {
+    const shiftBadge = emp.shiftCode === 'General'
+      ? `<span class="badge-day">General</span>`
+      : `<span class="badge-night">Shift ${emp.shiftCode}</span>`;
+
+    const typeBadge = emp.type === 'Boarding'
+      ? `<span style="background:#fde8e8;color:#c0392b;padding:2px 8px;
+           border-radius:4px;font-size:.7rem;font-weight:700;">Boarding</span>`
+      : `<span style="background:#e8f0f8;color:#1a3a5c;padding:2px 8px;
+           border-radius:4px;font-size:.7rem;font-weight:700;">Home Living</span>`;
+
+    return `<tr>
+      <td class="left" style="padding:6px 10px;font-weight:700;">${emp.epfNo}</td>
+      <td class="left" style="padding:6px 10px;">${emp.name}</td>
+      <td style="padding:6px 10px;text-align:center;">${emp.dept}</td>
+      <td style="padding:6px 10px;text-align:center;">${shiftBadge}</td>
+      <td style="padding:6px 10px;text-align:center;">${typeBadge}</td>
+      <td style="padding:6px 10px;text-align:center;">
+        <button onclick="editEmployee('${emp.epfNo}')"
+          style="background:#e8f0f8;color:#1a3a5c;border:none;padding:4px 10px;
+          border-radius:4px;cursor:pointer;font-size:.75rem;margin-right:4px;">
+          ✎ Edit
+        </button>
+        <button onclick="deleteEmployee('${emp.epfNo}')"
+          style="background:#fde8e8;color:#c0392b;border:none;padding:4px 10px;
+          border-radius:4px;cursor:pointer;font-size:.75rem;">
+          ✕ Delete
+        </button>
+      </td>
+    </tr>`;
+  }).join('');
+
+  // Update pagination info display
+  const showingFrom = startIdx + 1;
+  const showingTo   = Math.min(startIdx + pageSize, totalRows);
+  document.getElementById('emp-page-info').textContent =
+    `Showing ${showingFrom}–${showingTo} of ${totalRows}  •  Page ${emp_currentPage} of ${totalPages}`;
+}
+
+// ── resetEmployeeForm ─────────────────────────────────────────
+// Clears the form and exits edit mode, unlocking the EPF No
+// field for the next new entry.
+function resetEmployeeForm() {
+  employeeEditId = null;
+
+  document.getElementById('emp-epfno').value     = '';
+  document.getElementById('emp-epfno').readOnly  = false;   // unlock for new entries
+  document.getElementById('emp-name').value      = '';
+  document.getElementById('emp-dept').value      = '';
+  document.getElementById('emp-shiftcode').value = 'A';
+  document.getElementById('emp-type').value      = 'HomeLiving';
+
+  document.getElementById('emp-save-btn').textContent     = '➕ Add Employee';
+  document.getElementById('emp-cancel-btn').style.display = 'none';
+  document.getElementById('emp-status').textContent       = '';
+}
+
+// ════════════════════════════════════════════════════════════
+//  MEAL SYSTEM — STEP 2: MEAL REQUEST
+//  Firestore collection : meal_requests
+//  Document ID          : auto
+//
+//  Fields per request document:
+//    epfNo, name, dept, type, shiftCode,
+//    actualShift   ('Day'|'Night'|'General' — resolved for forDate)
+//    mealType      ('Breakfast'|'Lunch'|'Dinner'|'Tea1'|'Tea2')
+//    forDate       (YYYY-MM-DD — the date this meal is served)
+//    requestedAt   (ISO timestamp)
+//    status        ('Pending'|'Issued'|'Missed')
+//    issuedAt      (ISO timestamp, set when issued)
+//
+//  ── ELIGIBILITY RULES (the core logic of this step) ──────
+//
+//  HOME LIVING (request on entry, for THEIR shift TODAY only):
+//    Day      → Lunch (today) + Tea1 + Tea2
+//    Night    → Dinner (today) + Tea1 + Tea2
+//    General  → Lunch (today) + Tea1 + Tea2
+//
+//  BOARDING (requests depend on shift + time of day):
+//    Day shift, before 2:00 PM:
+//       → Today's Lunch (entry) + Today's Dinner (deadline 2pm)
+//         + Tomorrow's Breakfast (deadline 9pm) + Tea1 + Tea2
+//    Day shift, after 2:00 PM but before 9:00 PM:
+//       → Tomorrow's Breakfast only (Dinner window has closed)
+//    Night shift (request at entry to shift, ~7pm):
+//       → Tonight's Dinner (entry) + Tomorrow's Breakfast
+//         + Tomorrow's Lunch (deadline 9pm) + Tea1 + Tea2
+//
+//  MAINTENANCE DEPT (any employee, boarding or home-living):
+//    → Additional Breakfast option always available alongside
+//      their normal entitlement (deadline 9pm prior day)
+// ════════════════════════════════════════════════════════════
+
+// Currently looked-up employee (set after scan/search)
+let mrCurrentEmployee = null;
+
+// html5-qrcode scanner instance — created/destroyed on toggle
+let mrQrScanner = null;
+let mrScannerActive = false;
+
+
+// ── toggleQRScanner ──────────────────────────────────────────
+// Starts or stops the camera-based QR scanner. Uses the
+// html5-qrcode library which handles camera permissions and
+// QR decoding. On successful scan, calls lookupEmployeeForRequest
+// automatically and stops the camera to save battery/avoid
+// duplicate scans.
+async function toggleQRScanner() {
+  const readerDiv = document.getElementById('mr-qr-reader');
+  const btn       = document.getElementById('mr-scan-toggle-btn');
+
+  if (mrScannerActive) {
+    // ── Stop scanning ──────────────────────────────────────
+    if (mrQrScanner) {
+      await mrQrScanner.stop().catch(() => {});
+      mrQrScanner.clear();
+    }
+    readerDiv.style.display = 'none';
+    btn.textContent = '📷 Start Camera Scan';
+    mrScannerActive = false;
+    return;
+  }
+
+  // ── Start scanning ────────────────────────────────────────
+  readerDiv.style.display = 'block';
+  btn.textContent = '✕ Stop Camera';
+  mrScannerActive = true;
+
+  mrQrScanner = new Html5Qrcode('mr-qr-reader');
+
+  try {
+    await mrQrScanner.start(
+      { facingMode: 'environment' },   // prefer rear camera on mobile
+      { fps: 10, qrbox: 240 },
+      (decodedText) => {
+        // QR successfully decoded — look up employee, stop camera
+        lookupEmployeeForRequest(decodedText.trim());
+        toggleQRScanner();   // auto-stop after successful scan
+      },
+      () => { /* ignore per-frame scan failures — normal while aiming */ }
+    );
+  } catch (e) {
+    toast('Camera error: ' + e.message + ' — use manual entry instead', true);
+    readerDiv.style.display = 'none';
+    btn.textContent = '📷 Start Camera Scan';
+    mrScannerActive = false;
+  }
+}
+
+// ── lookupEmployeeForRequest ──────────────────────────────────
+// Looks up an employee by EPF No (from scan or manual entry),
+// then renders their eligible meal options.
+async function lookupEmployeeForRequest(epfNo) {
+  epfNo = epfNo.trim();
+  if (!epfNo) return;
+
+  // Use cached employees if already loaded, else fetch fresh
+  let emp = employees[epfNo];
+  if (!emp) {
+    try {
+      const doc = await db.collection('employees').doc(epfNo).get();
+      if (doc.exists) emp = doc.data();
+    } catch (e) {
+      console.error('lookupEmployeeForRequest:', e);
+    }
+  }
+
+  if (!emp) {
+    document.getElementById('mr-status').innerHTML =
+      `<span style="color:#c0392b;">❌ No employee found for EPF No "${epfNo}"</span>`;
+    document.getElementById('mr-employee-card').style.display = 'none';
+    return;
+  }
+
+  mrCurrentEmployee = emp;
+  document.getElementById('mr-manual-epf').value = '';
+  document.getElementById('mr-status').textContent = '';
+
+  await renderMealOptions();
+}
+
+// ── clearEmployeeLookup ───────────────────────────────────────
+function clearEmployeeLookup() {
+  mrCurrentEmployee = null;
+  document.getElementById('mr-employee-card').style.display = 'none';
+  document.getElementById('mr-manual-epf').value = '';
+  document.getElementById('mr-manual-epf').focus();
+}
+
+// ── getMealEligibility ────────────────────────────────────────
+// THE CORE ELIGIBILITY ENGINE.
+// Given an employee and the current moment, returns an array
+// of meal options they can currently request:
+//   [{ mealType, forDate, label, deadlineNote }, ...]
+//
+// "now" is passed in (not read fresh) so the whole function
+// is testable and consistent within a single render pass.
+function getMealEligibility(emp, now) {
+  const options = [];
+
+  // Use shift-aware date instead of plain calendar date —
+  // ensures Night shift early-morning requests still log
+  // under the date the shift STARTED, not the next calendar day
+  const todayStr     = getShiftDate(emp, now);
+  const actualShift  = resolveActualShift(emp.shiftCode, now);
+
+  // Tomorrow is still calculated from the actual calendar date
+  // (tomorrow's breakfast/lunch genuinely means the next real day)
+  const tomorrow    = new Date(now);
+  tomorrow.setDate(now.getDate() + 1);
+  const tomorrowStr = dateKey(tomorrow);
+
+  // Current hour as decimal (e.g. 14.5 = 2:30pm) for deadline checks
+  const hourDecimal = now.getHours() + now.getMinutes() / 60;
+
+  // ── Tea — both Tea 1 and Tea 2 offer a Milk/Plain choice ────
+// Each slot shows two separate options so the employee can
+// pick exactly one tea type per slot.
+options.push({ mealType: 'Tea1_Milk',  forDate: todayStr, label: 'Tea 1 — Milk Tea'  });
+options.push({ mealType: 'Tea1_Plain', forDate: todayStr, label: 'Tea 1 — Plain Tea' });
+options.push({ mealType: 'Tea2_Milk',  forDate: todayStr, label: 'Tea 2 — Milk Tea'  });
+options.push({ mealType: 'Tea2_Plain', forDate: todayStr, label: 'Tea 2 — Plain Tea' });
+
+  // ── HOME LIVING RULES ──────────────────────────────────────
+  if (emp.type === 'HomeLiving') {
+    if (actualShift === 'Day' || actualShift === 'General') {
+      options.push({ mealType: 'Lunch', forDate: todayStr, label: "Today's Lunch" });
+    } else if (actualShift === 'Night') {
+      options.push({ mealType: 'Dinner', forDate: todayStr, label: "Today's Dinner" });
+    }
+  }
+
+  // ── BOARDING RULES ──────────────────────────────────────────
+  if (emp.type === 'Boarding') {
+    if (actualShift === 'Day' || actualShift === 'General') {
+      // Day boarding: Lunch always available on entry
+      options.push({ mealType: 'Lunch', forDate: todayStr, label: "Today's Lunch (entry)" });
+
+      // Today's Dinner — only requestable before 2:00 PM
+      if (hourDecimal < 14) {
+        options.push({
+          mealType: 'Dinner', forDate: todayStr,
+          label: "Today's Dinner", deadlineNote: 'Deadline 2:00 PM today'
+        });
+      }
+
+      // Tomorrow's Breakfast — only requestable before 9:00 PM
+      if (hourDecimal < 21) {
+        options.push({
+          mealType: 'Breakfast', forDate: tomorrowStr,
+          label: "Tomorrow's Breakfast", deadlineNote: 'Deadline 9:00 PM today'
+        });
+      }
+    } else if (actualShift === 'Night') {
+      // Night boarding: Dinner on entry to shift
+      options.push({ mealType: 'Dinner', forDate: todayStr, label: "Tonight's Dinner (entry)" });
+
+      // Tomorrow's Breakfast + Lunch — only requestable before 9:00 PM
+      if (hourDecimal < 21) {
+        options.push({
+          mealType: 'Breakfast', forDate: tomorrowStr,
+          label: "Tomorrow's Breakfast", deadlineNote: 'Deadline 9:00 PM today'
+        });
+        options.push({
+          mealType: 'Lunch', forDate: tomorrowStr,
+          label: "Tomorrow's Lunch", deadlineNote: 'Deadline 9:00 PM today'
+        });
+      }
+    }
+  }
+
+  // ── MAINTENANCE BONUS BREAKFAST ─────────────────────────────
+  // Any maintenance employee (boarding or home-living) can
+  // additionally request breakfast for early arrival, with the
+  // same 9pm-prior-day deadline. Avoid duplicate if boarding
+  // night-shift already added breakfast above.
+  if (emp.dept === 'Maintenance' && hourDecimal < 21) {
+    const alreadyHasBreakfast = options.some(
+      o => o.mealType === 'Breakfast' && o.forDate === tomorrowStr
+    );
+    if (!alreadyHasBreakfast) {
+      options.push({
+        mealType: 'Breakfast', forDate: tomorrowStr,
+        label: 'Tomorrow\'s Breakfast (Maintenance early arrival)',
+        deadlineNote: 'Deadline 9:00 PM today'
+      });
+    }
+  }
+
+  return options;
+}
+
+// ── renderMealOptions ────────────────────────────────────────
+// Renders the employee info card and their eligible meal
+// buttons. Also fetches and shows any meals already requested
+// for today/tomorrow so security doesn't duplicate-submit.
+async function renderMealOptions() {
+  const emp = mrCurrentEmployee;
+  if (!emp) return;
+
+  const now = new Date();
+
+  // ── Show employee info ────────────────────────────────────
+  document.getElementById('mr-employee-card').style.display = '';
+  document.getElementById('mr-emp-name').textContent = `${emp.name}  (${emp.epfNo})`;
+
+  const actualShift = resolveActualShift(emp.shiftCode, now);
+  const typeBadge    = emp.type === 'Boarding' ? '🛏️ Boarding' : '🏠 Home Living';
+  document.getElementById('mr-emp-meta').textContent =
+    `${emp.dept}  •  Shift ${emp.shiftCode} (currently ${actualShift})  •  ${typeBadge}`;
+
+  // ── Get eligible options ──────────────────────────────────
+  const options = getMealEligibility(emp, now);
+
+  // ── Fetch existing requests for today + tomorrow ──────────
+  const todayStr    = dateKey(now);
+  const tomorrow     = new Date(now);
+  tomorrow.setDate(now.getDate() + 1);
+  const tomorrowStr  = dateKey(tomorrow);
+
+  const existingSnap = await db.collection('meal_requests')
+    .where('epfNo', '==', emp.epfNo)
+    .where('forDate', 'in', [todayStr, tomorrowStr])
+    .get();
+
+  const existing = {};   // key: "mealType_forDate" → status
+  existingSnap.forEach(d => {
+    const r = d.data();
+    existing[`${r.mealType}_${r.forDate}`] = r.status;
+  });
+// ── Tea slot mutual exclusion ──────────────────────────────
+// If Tea1_Milk is already requested, Tea1_Plain should also
+// be considered "taken" for display purposes (and vice versa),
+// since only one tea type is allowed per slot.
+['Tea1', 'Tea2'].forEach(slot => {
+  const milkKey  = `${slot}_Milk_${todayStr}`;
+  const plainKey = `${slot}_Plain_${todayStr}`;
+  if (existing[milkKey] && !existing[plainKey]) {
+    existing[plainKey] = 'Skipped';   // mark sibling as unavailable
+  }
+  if (existing[plainKey] && !existing[milkKey]) {
+    existing[milkKey] = 'Skipped';
+  }
+});
+
+
+// ── Separate tea options from main meal options ─────────────
+const teaOptions  = options.filter(o => o.mealType.startsWith('Tea'));
+const mealOptions = options.filter(o => !o.mealType.startsWith('Tea'));
+
+
+  // ── Render meal option buttons ─────────────────────────────
+// ── Render main meal options (Breakfast/Lunch/Dinner) ───────
+const optionsDiv = document.getElementById('mr-meal-options');
+optionsDiv.innerHTML = mealOptions.map(opt => {
+  const key         = `${opt.mealType}_${opt.forDate}`;
+  const alreadyDone = existing[key];
+
+  if (alreadyDone) {
+    const statusColor = alreadyDone === 'Issued' ? '#1e8449'
+                       : alreadyDone === 'Missed' ? '#c0392b' : '#854f0b';
+    return `<div style="background:#f0f4f8;border:1px solid #d0d8e4;
+                 border-radius:8px;padding:12px 14px;">
+      <div style="font-weight:700;color:#5a6e84;">${opt.label}</div>
+      <div style="font-size:.78rem;color:${statusColor};font-weight:700;margin-top:4px;">
+        ${alreadyDone === 'Issued' ? '✔ Already Issued' :
+          alreadyDone === 'Missed' ? '✕ Missed' : '⏳ Already Requested'}
+      </div>
+    </div>`;
+  }
+
+      return `<button onclick="submitMealRequest('${opt.mealType}','${opt.forDate}','${opt.label.replace(/'/g, "\\'")}')"
+      style="background:#fff;border:2px solid #1a3a5c;border-radius:8px;
+             padding:12px 14px;cursor:pointer;text-align:left;transition:.15s;"
+      onmouseover="this.style.background='#eef3f9'"
+      onmouseout="this.style.background='#fff'">
+    <div style="font-weight:700;color:#1a3a5c;">${opt.label}</div>
+    ${opt.deadlineNote
+      ? `<div style="font-size:.72rem;color:#854f0b;margin-top:4px;">⏰ ${opt.deadlineNote}</div>`
+      : ''}
+  </button>`;
+}).join('');
+
+
+if (!mealOptions.length) {
+  optionsDiv.innerHTML = `<div style="grid-column:1/-1;color:#888;font-style:italic;">
+    No main meal options currently available.
+  </div>`;
+
+
+}
+// ── Render tea options — grouped by slot, side-by-side ──────
+const teaDiv = document.getElementById('mr-tea-options');
+const slots  = ['Tea1', 'Tea2'];
+
+teaDiv.innerHTML = slots.map(slot => {
+  const slotLabel = slot === 'Tea1' ? 'Tea 1' : 'Tea 2';
+  const milkOpt   = teaOptions.find(o => o.mealType === `${slot}_Milk`);
+  const plainOpt  = teaOptions.find(o => o.mealType === `${slot}_Plain`);
+  if (!milkOpt && !plainOpt) return '';
+
+  // Small button renderer for one tea choice
+  const teaBtn = (opt, type) => {
+    if (!opt) return '';
+    const key         = `${opt.mealType}_${opt.forDate}`;
+    const alreadyDone = existing[key];
+
+    if (alreadyDone) {
+      const statusColor = alreadyDone === 'Issued'  ? '#1e8449'
+                         : alreadyDone === 'Missed'  ? '#c0392b'
+                         : alreadyDone === 'Skipped' ? '#aaa'
+                         : '#854f0b';
+      const statusLabel = alreadyDone === 'Issued'  ? '✔ Issued'
+                         : alreadyDone === 'Missed'  ? '✕ Missed'
+                         : alreadyDone === 'Skipped' ? '— Not chosen'
+                         : '⏳ Requested';
+      return `<div style="flex:1;background:#f0f4f8;border:1px solid #d0d8e4;
+                   border-radius:6px;padding:8px 10px;text-align:center;">
+        <div style="font-size:.78rem;font-weight:700;color:#5a6e84;">${type}</div>
+        <div style="font-size:.7rem;color:${statusColor};font-weight:700;margin-top:2px;">
+          ${statusLabel}
+        </div>
+      </div>`;
+    }
+
+    return `<button onclick="submitMealRequest('${opt.mealType}','${opt.forDate}','${slotLabel} — ${type}')"
+        style="flex:1;background:#fff;border:2px solid #1a3a5c;border-radius:6px;
+               padding:8px 10px;cursor:pointer;text-align:center;transition:.15s;"
+        onmouseover="this.style.background='#eef3f9'"
+        onmouseout="this.style.background='#fff'">
+      <div style="font-size:.82rem;font-weight:700;color:#1a3a5c;">${type}</div>
+    </button>`;
+  };
+
+  return `<div style="margin-bottom:10px;">
+    <div style="font-size:.78rem;font-weight:700;color:#5a6e84;
+                text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">
+      ${slotLabel}
+    </div>
+    <div style="display:flex;gap:8px;">
+      ${teaBtn(milkOpt,  '🍵 Milk Tea')}
+      ${teaBtn(plainOpt, '🍃 Plain Tea')}
+    </div>
+  </div>`;
+}).join('');
+}
+
+// ── submitMealRequest ────────────────────────────────────────
+// Saves a new meal request document to Firestore for the
+// currently looked-up employee, then refreshes the options
+// view so the just-submitted meal shows as "Already Requested".
+async function submitMealRequest(mealType, forDate, label) {
+  const emp = mrCurrentEmployee;
+  if (!emp) return;
+
+  const now         = new Date();
+  const actualShift = resolveActualShift(emp.shiftCode, now);
+
+  try {
+    await db.collection('meal_requests').add({
+      epfNo:        emp.epfNo,
+      name:         emp.name,
+      dept:         emp.dept,
+      type:         emp.type,
+      shiftCode:    emp.shiftCode,
+      actualShift,
+      mealType,
+      forDate,
+      requestedAt:  new Date().toISOString(),
+      status:       'Pending',
+      issuedAt:     null
+    });
+
+    toast(`✔ ${label} requested for ${emp.name}`);
+    await renderMealOptions();   // refresh to show updated status
+  } catch (e) {
+    toast('Request error: ' + e.message, true);
+  }
+  // Add at the end of submitMealRequest, after toast():
+if (forDate === document.getElementById('mrl-date').value) {
+  loadMealRequestLog();
+}
+}
+// ════════════════════════════════════════════════════════════
+//  MEAL SYSTEM — DAILY MEAL REQUEST LOG
+//  Read-only view of all meal_requests for a selected date.
+//  Reuses the same search + pagination pattern as Employee
+//  Register for consistency.
+// ════════════════════════════════════════════════════════════
+
+let mealRequestLogCache = [];   // in-memory cache for current date
+let mrl_currentPage     = 1;
+
+// ── initMealRequestLog ───────────────────────────────────────
+// Sets today's date and loads the log automatically.
+function initMealRequestLog() {
+  const now = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  document.getElementById('mrl-date').value =
+    `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
+  loadMealRequestLog();
+}
+
+// ── loadMealRequestLog ────────────────────────────────────────
+// Fetches all meal_requests where forDate matches the selected
+// date, caches them, then renders the filtered/paginated table.
+async function loadMealRequestLog() {
+  const date  = document.getElementById('mrl-date').value;
+  if (!date) return;
+
+  const tbody = document.getElementById('mrl-table-body');
+  tbody.innerHTML = '<tr><td colspan="9" class="loading-cell">⏳ Loading…</td></tr>';
+
+  try {
+    const snap = await db.collection('meal_requests')
+      .where('forDate', '==', date)
+      .orderBy('requestedAt', 'desc')
+      .get();
+
+    mealRequestLogCache = [];
+    snap.forEach(d => mealRequestLogCache.push({ id: d.id, ...d.data() }));
+
+    mrl_currentPage = 1;
+    renderMealRequestLog();
+  } catch (e) {
+    console.error('loadMealRequestLog:', e);
+    tbody.innerHTML = `<tr><td colspan="9" class="loading-cell" style="color:#c0392b;">
+      Error: ${e.message}</td></tr>`;
+  }
+}
+
+// ── mrlGoToPage ───────────────────────────────────────────────
+function mrlGoToPage(page) {
+  mrl_currentPage = page;
+  renderMealRequestLog();
+}
+
+// ── renderMealRequestLog ──────────────────────────────────────
+// Groups all requests by EPF No so each employee shows as ONE
+// row per day, with all their requested meals listed together
+// (each meal tagged with its own status).
+function renderMealRequestLog() {
+  const tbody        = document.getElementById('mrl-table-body');
+  const searchTerm    = (document.getElementById('mrl-search')?.value || '').toLowerCase().trim();
+  const statusFilter  = document.getElementById('mrl-status-filter')?.value || 'ALL';
+  const pageSize      = 15;
+
+  // Friendly meal type labels
+  const mealLabels = {
+    Breakfast:  '🍳 Breakfast',
+    Lunch:      '🍛 Lunch',
+    Dinner:     '🍽️ Dinner',
+    Tea1_Milk:  '🍵 Tea1-Milk',
+    Tea1_Plain: '🍃 Tea1-Plain',
+    Tea2_Milk:  '🍵 Tea2-Milk',
+    Tea2_Plain: '🍃 Tea2-Plain',
+    Tea1:       'Tea1',   // legacy fallback for old test data
+    Tea2:       'Tea2',
+  };
+
+  // ── Step 1: Group requests by EPF No ───────────────────────
+  const grouped = {};   // { epfNo: { ...employee info, meals: [] } }
+  mealRequestLogCache.forEach(r => {
+    if (!grouped[r.epfNo]) {
+      grouped[r.epfNo] = {
+        epfNo: r.epfNo, name: r.name, dept: r.dept,
+        type: r.type, actualShift: r.actualShift,
+        meals: []
+      };
+    }
+    grouped[r.epfNo].meals.push(r);
+  });
+
+  let list = Object.values(grouped);
+
+  // ── Step 2: Apply search filter ────────────────────────────
+  if (searchTerm) {
+    list = list.filter(e =>
+      e.name.toLowerCase().includes(searchTerm) ||
+      e.epfNo.toLowerCase().includes(searchTerm)
+    );
+  }
+
+  // ── Step 3: Apply status filter ────────────────────────────
+  // Shows employee if AT LEAST ONE of their meals matches the filter
+  if (statusFilter !== 'ALL') {
+    list = list.filter(e => e.meals.some(m => m.status === statusFilter));
+  }
+
+  // Sort alphabetically by name
+  list.sort((a, b) => a.name.localeCompare(b.name));
+
+  const totalRows  = list.length;
+  const totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
+  if (mrl_currentPage > totalPages) mrl_currentPage = totalPages;
+  if (mrl_currentPage < 1)          mrl_currentPage = 1;
+
+  const startIdx = (mrl_currentPage - 1) * pageSize;
+  const pageList = list.slice(startIdx, startIdx + pageSize);
+
+  if (!pageList.length) {
+    tbody.innerHTML = '<tr><td colspan="6" class="loading-cell">No requests found.</td></tr>';
+    document.getElementById('mrl-page-info').textContent = '0 results';
+    return;
+  }
+
+  tbody.innerHTML = pageList.map(emp => {
+    const typeBadge = emp.type === 'Boarding'
+      ? `<span style="background:#fde8e8;color:#c0392b;padding:2px 8px;
+           border-radius:4px;font-size:.7rem;font-weight:700;">Boarding</span>`
+      : `<span style="background:#e8f0f8;color:#1a3a5c;padding:2px 8px;
+           border-radius:4px;font-size:.7rem;font-weight:700;">Home Living</span>`;
+
+    const shiftBadge = emp.actualShift === 'Night'
+      ? `<span class="badge-night">Night</span>`
+      : `<span class="badge-day">${emp.actualShift}</span>`;
+
+    // ── Build the combined meals cell — each meal as a small tag
+    // with its own status colour, all on one line, wrapping if needed
+    const mealsCell = emp.meals.map(m => {
+      const label = mealLabels[m.mealType] || m.mealType;
+      const color = m.status === 'Issued' ? '#1e8449'
+                  : m.status === 'Missed' ? '#c0392b' : '#854f0b';
+      const icon  = m.status === 'Issued' ? '✔' : m.status === 'Missed' ? '✕' : '⏳';
+
+      return `<span style="display:inline-block;background:#f0f4f8;
+                   border:1px solid #d0d8e4;border-radius:5px;
+                   padding:3px 8px;margin:2px 3px 2px 0;font-size:.74rem;
+                   white-space:nowrap;">
+        ${label}
+        <span style="color:${color};font-weight:700;margin-left:3px;">${icon}</span>
+      </span>`;
+    }).join('');
+
+    return `<tr>
+      <td class="left" style="padding:6px 10px;font-weight:700;vertical-align:top;">${emp.epfNo}</td>
+      <td class="left" style="padding:6px 10px;vertical-align:top;">${emp.name}</td>
+      <td style="padding:6px 10px;text-align:center;vertical-align:top;">${emp.dept}</td>
+      <td style="padding:6px 10px;text-align:center;vertical-align:top;">${typeBadge}</td>
+      <td style="padding:6px 10px;text-align:center;vertical-align:top;">${shiftBadge}</td>
+      <td style="padding:6px 10px;vertical-align:top;">${mealsCell}</td>
+    </tr>`;
+  }).join('');
+
+  const showingFrom = startIdx + 1;
+  const showingTo   = Math.min(startIdx + pageSize, totalRows);
+  document.getElementById('mrl-page-info').textContent =
+    `Showing ${showingFrom}–${showingTo} of ${totalRows} employees  •  Page ${mrl_currentPage} of ${totalPages}`;
+}
+
+// ════════════════════════════════════════════════════════════
+//  MEAL SYSTEM — STEP 3: MEAL ISSUE
+//  Same scan/search flow as Meal Request, but instead of
+//  showing ELIGIBLE meals to request, this shows only the
+//  meal/tea whose TIME SLOT is currently active right now,
+//  filtered to requests with status = 'Pending'.
+//
+//  Time slots (server/local time based):
+//    Breakfast  : 07:00 – 09:00
+//    Lunch      : 12:30 – 15:00
+//    Dinner     : 20:00 – 22:00
+//    Day Tea1   : 10:00 – 11:00
+//    Day Tea2   : 15:00 – 16:00
+//    Night Tea1 : 00:00 – 01:00
+//    Night Tea2 : 04:00 – 05:00
+//
+//  A meal is "issuable" only if:
+//    1. Its mealType matches what's active RIGHT NOW
+//    2. forDate matches the date that slot is serving
+//       (today for same-day slots, or the relevant date
+//        for overnight slots like Night Tea1/Tea2)
+//    3. status === 'Pending' (not already issued/missed)
+// ════════════════════════════════════════════════════════════
+
+let miCurrentEmployee = null;
+let miQrScanner        = null;
+let miScannerActive     = false;
+
+
+// ── getActiveSlots ────────────────────────────────────────────
+// Now requires the employee being checked, since the correct
+// "today" depends on their shift (Night shift's early-morning
+// hours belong to yesterday's shift date).
+function getActiveSlots(now, emp) {
+  const h         = now.getHours() + now.getMinutes() / 60;
+  const today     = emp ? getShiftDate(emp, now) : dateKey(now);
+  const slots     = [];
+
+  // ── Breakfast 07:00–09:00 ───────────────────────────────
+  if (h >= 7 && h < 9) {
+    slots.push({ mealType: 'Breakfast', forDate: today, label: '🍳 Breakfast' });
+  }
+  // ── Lunch 12:30–15:00 ────────────────────────────────────
+  if (h >= 12.5 && h < 15) {
+    slots.push({ mealType: 'Lunch', forDate: today, label: '🍛 Lunch' });
+  }
+  // ── Dinner 20:00–22:00 ───────────────────────────────────
+  if (h >= 20 && h < 22) {
+    slots.push({ mealType: 'Dinner', forDate: today, label: '🍽️ Dinner' });
+  }
+  // ── Day Tea 1: 10:00–11:00 ───────────────────────────────
+  if (h >= 10 && h < 11) {
+    slots.push({ mealType: 'Tea1_Milk',  forDate: today, label: '🍵 Tea 1 — Milk Tea'  });
+    slots.push({ mealType: 'Tea1_Plain', forDate: today, label: '🍃 Tea 1 — Plain Tea' });
+  }
+  // ── Day Tea 2: 15:00–16:00 ───────────────────────────────
+  if (h >= 15 && h < 16) {
+    slots.push({ mealType: 'Tea2_Milk',  forDate: today, label: '🍵 Tea 2 — Milk Tea'  });
+    slots.push({ mealType: 'Tea2_Plain', forDate: today, label: '🍃 Tea 2 — Plain Tea' });
+  }
+  // ── Night Tea 1: 00:00–01:00 — belongs to PREVIOUS shift date
+  if (h >= 0 && h < 1) {
+    slots.push({ mealType: 'Tea1_Milk',  forDate: today, label: '🍵 Night Tea 1 — Milk Tea'  });
+    slots.push({ mealType: 'Tea1_Plain', forDate: today, label: '🍃 Night Tea 1 — Plain Tea' });
+  }
+  // ── Night Tea 2: 04:00–05:00 — belongs to PREVIOUS shift date
+  if (h >= 4 && h < 5) {
+    slots.push({ mealType: 'Tea2_Milk',  forDate: today, label: '🍵 Night Tea 2 — Milk Tea'  });
+    slots.push({ mealType: 'Tea2_Plain', forDate: today, label: '🍃 Night Tea 2 — Plain Tea' });
+  }
+
+  return slots;
+}
+
+// ── updateActiveSlotBanner ────────────────────────────────────
+// Shows a banner telling security which slot(s) are currently
+// open for issuing, or a message if nothing is active right now.
+function updateActiveSlotBanner() {
+  const now    = new Date();
+  const active = getActiveSlots(now);
+  const banner = document.getElementById('mi-active-slot-banner');
+
+  if (!active.length) {
+    banner.textContent = '⏸ No meal/tea slot is currently active. Issue button will activate during serving hours.';
+    banner.style.background = '#f0f4f8';
+    banner.style.borderColor = '#d0d8e4';
+    banner.style.color = '#5a6e84';
+    return;
+  }
+
+  const labels = [...new Set(active.map(s => s.label.replace(/^[^\s]+\s/, '')))].join(', ');
+  banner.textContent = `🟢 Currently serving: ${labels}`;
+  banner.style.background = '#f0faf0';
+  banner.style.borderColor = '#1e8449';
+  banner.style.color = '#1e8449';
+}
+
+// Refresh the banner every 30 seconds so it stays accurate
+// without requiring a page reload during a shift.
+setInterval(updateActiveSlotBanner, 30000);
+
+
+// ── toggleIssueQRScanner ───────────────────────────────────────
+// Identical pattern to toggleQRScanner from Step 2, using a
+// separate scanner instance so Request and Issue tabs don't
+// conflict if both happen to be open.
+async function toggleIssueQRScanner() {
+  const readerDiv = document.getElementById('mi-qr-reader');
+  const btn       = document.getElementById('mi-scan-toggle-btn');
+
+  if (miScannerActive) {
+    if (miQrScanner) {
+      await miQrScanner.stop().catch(() => {});
+      miQrScanner.clear();
+    }
+    readerDiv.style.display = 'none';
+    btn.textContent = '📷 Start Camera Scan';
+    miScannerActive = false;
+    return;
+  }
+
+  readerDiv.style.display = 'block';
+  btn.textContent = '✕ Stop Camera';
+  miScannerActive = true;
+
+  miQrScanner = new Html5Qrcode('mi-qr-reader');
+
+  try {
+    await miQrScanner.start(
+      { facingMode: 'environment' },
+      { fps: 10, qrbox: 240 },
+      (decodedText) => {
+        lookupEmployeeForIssue(decodedText.trim());
+        toggleIssueQRScanner();
+      },
+      () => { /* ignore per-frame failures */ }
+    );
+  } catch (e) {
+    toast('Camera error: ' + e.message + ' — use manual entry instead', true);
+    readerDiv.style.display = 'none';
+    btn.textContent = '📷 Start Camera Scan';
+    miScannerActive = false;
+  }
+}
+
+// ── lookupEmployeeForIssue ────────────────────────────────────
+// Looks up the employee, then renders only the meals that are
+// BOTH currently active (time-slot wise) AND still Pending for
+// this employee.
+async function lookupEmployeeForIssue(epfNo) {
+  epfNo = epfNo.trim();
+  if (!epfNo) return;
+
+  let emp = employees[epfNo];
+  if (!emp) {
+    try {
+      const doc = await db.collection('employees').doc(epfNo).get();
+      if (doc.exists) emp = doc.data();
+    } catch (e) {
+      console.error('lookupEmployeeForIssue:', e);
+    }
+  }
+
+  if (!emp) {
+    document.getElementById('mi-status').innerHTML =
+      `<span style="color:#c0392b;">❌ No employee found for EPF No "${epfNo}"</span>`;
+    document.getElementById('mi-employee-card').style.display = 'none';
+    return;
+  }
+
+  miCurrentEmployee = emp;
+  document.getElementById('mi-manual-epf').value = '';
+  document.getElementById('mi-status').textContent = '';
+
+  await renderIssueOptions();
+}
+
+// ── clearIssueLookup ───────────────────────────────────────────
+function clearIssueLookup() {
+  miCurrentEmployee = null;
+  document.getElementById('mi-employee-card').style.display = 'none';
+  document.getElementById('mi-manual-epf').value = '';
+  document.getElementById('mi-manual-epf').focus();
+}
+
+ // ── renderIssueOptions ─────────────────────────────────────────
+// TESTING MODE: shows ALL Pending requests for the employee,
+// regardless of current time slot. Time-slot filtering logic
+// is commented out below — restore it by uncommenting and
+// removing the testing block when ready for production.
+async function renderIssueOptions() {
+  const emp = miCurrentEmployee;
+  if (!emp) return;
+
+  const now = new Date();
+  document.getElementById('mi-employee-card').style.display = '';
+  document.getElementById('mi-emp-name').textContent = `${emp.name}  (${emp.epfNo})`;
+
+  const actualShift = resolveActualShift(emp.shiftCode, now);
+  const typeBadge    = emp.type === 'Boarding' ? '🛏️ Boarding' : '🏠 Home Living';
+  document.getElementById('mi-emp-meta').textContent =
+    `${emp.dept}  •  Shift ${emp.shiftCode} (currently ${actualShift})  •  ${typeBadge}`;
+
+  // Friendly meal labels for display
+  const mealLabels = {
+    Breakfast:  '🍳 Breakfast',
+    Lunch:      '🍛 Lunch',
+    Dinner:     '🍽️ Dinner',
+    Tea1_Milk:  '🍵 Tea 1 — Milk Tea',
+    Tea1_Plain: '🍃 Tea 1 — Plain Tea',
+    Tea2_Milk:  '🍵 Tea 2 — Milk Tea',
+    Tea2_Plain: '🍃 Tea 2 — Plain Tea',
+  };
+
+  // ═══════════════════════════════════════════════════════════
+  // 🧪 TESTING MODE — shows ALL pending requests, no time check
+  // ═══════════════════════════════════════════════════════════
+  let pendingSnap;
+  try {
+    pendingSnap = await db.collection('meal_requests')
+      .where('epfNo', '==', emp.epfNo)
+      .where('status', '==', 'Pending')
+      .get();
+  } catch (e) {
+    toast('Error fetching requests: ' + e.message, true);
+    return;
+  }
+
+  const optionsDiv = document.getElementById('mi-issue-options');
+
+  if (pendingSnap.empty) {
+    optionsDiv.innerHTML = `<div style="grid-column:1/-1;color:#888;font-style:italic;">
+      No pending requests for this employee.
+    </div>`;
+    return;
+  }
+
+  optionsDiv.innerHTML = pendingSnap.docs.map(doc => {
+    const r     = doc.data();
+    const label = `${mealLabels[r.mealType] || r.mealType} (${r.forDate})`;
+
+    return `<button onclick="issueMeal('${doc.id}','${label.replace(/'/g, "\\'")}')"
+        style="background:#fff;border:2px solid #1e8449;border-radius:8px;
+               padding:14px;cursor:pointer;text-align:center;transition:.15s;"
+        onmouseover="this.style.background='#f0faf0'"
+        onmouseout="this.style.background='#fff'">
+      <div style="font-weight:700;color:#1e8449;font-size:.95rem;">
+        ${mealLabels[r.mealType] || r.mealType}
+      </div>
+      <div style="font-size:.72rem;color:#888;margin-top:4px;">For: ${r.forDate}</div>
+      <div style="font-size:.72rem;color:#888;margin-top:2px;">Tap to Issue</div>
+    </button>`;
+  }).join('');
+
+  /* ═══════════════════════════════════════════════════════════
+     🔒 PRODUCTION LOGIC (commented out during testing)
+     Uncomment this block and delete the TESTING MODE block
+     above when ready to enforce time-slot restrictions.
+  ═══════════════════════════════════════════════════════════
+
+  // ── Get currently active slots ─────────────────────────────
+  const activeSlots = getActiveSlots(now, emp);
+
+  if (!activeSlots.length) {
+    document.getElementById('mi-issue-options').innerHTML =
+      `<div style="grid-column:1/-1;color:#888;font-style:italic;">
+        No meal/tea slot is active right now.
+      </div>`;
+    return;
+  }
+
+  // ── Fetch this employee's Pending requests for relevant dates
+  const relevantDates = [...new Set(activeSlots.map(s => s.forDate))];
+  const pendingSnap2 = await db.collection('meal_requests')
+    .where('epfNo', '==', emp.epfNo)
+    .where('status', '==', 'Pending')
+    .where('forDate', 'in', relevantDates)
+    .get();
+
+  const pendingMap = {};
+  pendingSnap2.forEach(d => {
+    const r = d.data();
+    pendingMap[`${r.mealType}_${r.forDate}`] = d.id;
+  });
+
+  const issuable = activeSlots.filter(s =>
+    pendingMap[`${s.mealType}_${s.forDate}`]
+  );
+
+  const optionsDiv2 = document.getElementById('mi-issue-options');
+
+  if (!issuable.length) {
+    optionsDiv2.innerHTML = `<div style="grid-column:1/-1;color:#888;font-style:italic;">
+      No pending request for this employee in the currently active slot(s).
+    </div>`;
+    return;
+  }
+
+  optionsDiv2.innerHTML = issuable.map(slot => {
+    const docId = pendingMap[`${slot.mealType}_${slot.forDate}`];
+    return `<button onclick="issueMeal('${docId}','${slot.label.replace(/'/g, "\\'")}')"
+        style="background:#fff;border:2px solid #1e8449;border-radius:8px;
+               padding:14px;cursor:pointer;text-align:center;transition:.15s;">
+      <div style="font-weight:700;color:#1e8449;font-size:.95rem;">${slot.label}</div>
+      <div style="font-size:.72rem;color:#888;margin-top:4px;">Tap to Issue</div>
+    </button>`;
+  }).join('');
+
+  ═══════════════════════════════════════════════════════════ */
 }

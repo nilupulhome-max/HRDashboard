@@ -15,6 +15,8 @@
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+  <!-- html5-qrcode: camera-based QR code scanning for meal requests -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
 </head>
 <body>
 
@@ -86,6 +88,7 @@
   </header>
 
 
+
   <!-- ════════════════════════════════════════════════════════
        TAB 01 — SECURITY DATA ENTRY  (unchanged)
        Contains:
@@ -95,6 +98,180 @@
   <div id="tab-security-entry" class="tab-content active">
   <div class="container">
 
+    <!-- ══════════════════════════════════════════════════
+     MEAL REQUEST TAB
+     Security scans employee QR (or types EPF No manually)
+     → system shows eligible meals based on time, type,
+       dept, and resolved shift → security submits request
+     Collection: meal_requests
+══════════════════════════════════════════════════ -->
+<div class="card">
+  <div class="card-title">📷 Meal Request — Scan or Search Employee</div>
+
+  <!-- ── Scan / Search controls ─────────────────────────── -->
+  <div class="form-grid-small" style="margin-bottom:14px;">
+    <div class="field" style="grid-column: span 2;">
+      <label>Manual EPF No Entry (fallback if camera unavailable)</label>
+      <input type="text" id="mr-manual-epf" placeholder="Type EPF No and press Enter"
+             onkeydown="if(event.key==='Enter') lookupEmployeeForRequest(this.value)"/>
+    </div>
+    <div class="field" style="justify-content:flex-end;">
+      <label>&nbsp;</label>
+      <button class="btn-save" onclick="toggleQRScanner()" id="mr-scan-toggle-btn">
+        📷 Start Camera Scan
+      </button>
+    </div>
+  </div>
+
+  <!-- QR scanner renders here when active -->
+  <div id="mr-qr-reader" style="max-width:380px;margin:0 auto 16px;display:none;"></div>
+
+  <!-- ── Employee result card — shown after successful lookup ── -->
+  <div id="mr-employee-card" style="display:none;background:#eef3f9;
+       border-radius:10px;padding:16px 18px;margin-top:10px;">
+
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;
+                flex-wrap:wrap;gap:10px;margin-bottom:14px;">
+      <div>
+        <div style="font-size:1.1rem;font-weight:700;color:#1a3a5c;" id="mr-emp-name"></div>
+        <div style="font-size:.8rem;color:#5a6e84;margin-top:2px;" id="mr-emp-meta"></div>
+      </div>
+      <button class="btn-clear" onclick="clearEmployeeLookup()">✕ Clear</button>
+    </div>
+
+    <!-- Eligible meal options render here -->
+    <div id="mr-meal-options" style="display:grid;gap:10px;
+         grid-template-columns:repeat(auto-fill,minmax(220px,1fr));"></div>
+
+         <!-- Eligible meal options render here -->
+<div id="mr-meal-options" style="display:grid;gap:10px;
+     grid-template-columns:repeat(auto-fill,minmax(220px,1fr));"></div>
+
+<!-- Tea options — grouped, side-by-side buttons per slot -->
+<div id="mr-tea-options" style="margin-top:16px;"></div>
+
+    <!-- Already-requested meals for today/tomorrow show here -->
+    <div id="mr-existing-requests" style="margin-top:16px;"></div>
+  </div>
+
+  <div id="mr-status" style="margin-top:12px;font-size:.85rem;font-weight:600;"></div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     DAILY MEAL REQUEST LOG
+     Shows all requests + their status for a selected date
+     Same scrollable + searchable pattern as Employee Register
+══════════════════════════════════════════════════ -->
+<div class="card">
+  <div class="card-title">📋 Daily Meal Request Log</div>
+
+  <div class="form-grid-small" style="margin-bottom:14px;">
+    <div class="field">
+      <label>Date</label>
+      <input type="date" id="mrl-date" onchange="loadMealRequestLog()"/>
+    </div>
+    <div class="field">
+      <label>Search by EPF No or Name</label>
+      <input type="text" id="mrl-search" placeholder="Type to search…"
+             oninput="mrl_currentPage = 1; renderMealRequestLog();"/>
+    </div>
+    <div class="field">
+      <label>Status</label>
+      <select id="mrl-status-filter" onchange="mrl_currentPage = 1; renderMealRequestLog();">
+        <option value="ALL">All Statuses</option>
+        <option value="Pending">Pending</option>
+        <option value="Issued">Issued</option>
+        <option value="Missed">Missed</option>
+      </select>
+    </div>
+    <div class="field" style="justify-content:flex-end;">
+      <label>&nbsp;</label>
+      <button class="btn-apply" onclick="loadMealRequestLog()">🔄 Refresh</button>
+    </div>
+  </div>
+
+  <div class="table-scroll" style="max-height:480px;overflow-y:auto;">
+    <table id="mrl-table">
+    <thead style="position:sticky;top:0;z-index:5;">
+          <tr class="th-sub">
+            <th class="left" style="padding:8px 10px;">EPF No</th>
+            <th class="left" style="padding:8px 10px;">Name</th>
+            <th style="padding:8px 10px;">Dept</th>
+            <th style="padding:8px 10px;">Type</th>
+            <th style="padding:8px 10px;">Shift</th>
+            <th class="left" style="padding:8px 10px;">Meals Requested</th>
+          </tr>
+        </thead>
+      <tbody id="mrl-table-body">
+        <tr><td colspan="9" class="loading-cell">Select a date to load.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div style="display:flex;justify-content:space-between;align-items:center;
+              margin-top:12px;font-size:.82rem;">
+    <span id="mrl-page-info" style="color:#5a6e84;"></span>
+    <div style="display:flex;gap:6px;">
+      <button class="btn-clear" onclick="mrlGoToPage(mrl_currentPage - 1)">‹ Prev</button>
+      <button class="btn-clear" onclick="mrlGoToPage(mrl_currentPage + 1)">Next ›</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     MEAL ISSUE TAB
+     Security scans employee QR (or types EPF No) →
+     system shows ONLY the meal/tea whose time slot is
+     currently active AND has a Pending request →
+     security taps to mark Issued
+     Collection: meal_requests (updates existing docs)
+══════════════════════════════════════════════════ -->
+<div class="card">
+  <div class="card-title">🍽️ Meal Issue — Scan or Search Employee</div>
+
+  <!-- Current active slot indicator -->
+  <div id="mi-active-slot-banner" style="background:#fff8e1;border:1px solid #f0a500;
+       border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:.85rem;
+       font-weight:600;color:#854f0b;"></div>
+
+  <!-- ── Scan / Search controls ─────────────────────────── -->
+  <div class="form-grid-small" style="margin-bottom:14px;">
+    <div class="field" style="grid-column: span 2;">
+      <label>Manual EPF No Entry (fallback if camera unavailable)</label>
+      <input type="text" id="mi-manual-epf" placeholder="Type EPF No and press Enter"
+             onkeydown="if(event.key==='Enter') lookupEmployeeForIssue(this.value)"/>
+    </div>
+    <div class="field" style="justify-content:flex-end;">
+      <label>&nbsp;</label>
+      <button class="btn-save" onclick="toggleIssueQRScanner()" id="mi-scan-toggle-btn">
+        📷 Start Camera Scan
+      </button>
+    </div>
+  </div>
+
+  <!-- QR scanner renders here when active -->
+  <div id="mi-qr-reader" style="max-width:380px;margin:0 auto 16px;display:none;"></div>
+
+  <!-- ── Employee result card ────────────────────────────── -->
+  <div id="mi-employee-card" style="display:none;background:#eef3f9;
+       border-radius:10px;padding:16px 18px;margin-top:10px;">
+
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;
+                flex-wrap:wrap;gap:10px;margin-bottom:14px;">
+      <div>
+        <div style="font-size:1.1rem;font-weight:700;color:#1a3a5c;" id="mi-emp-name"></div>
+        <div style="font-size:.8rem;color:#5a6e84;margin-top:2px;" id="mi-emp-meta"></div>
+      </div>
+      <button class="btn-clear" onclick="clearIssueLookup()">✕ Clear</button>
+    </div>
+
+    <!-- Issuable meals (matching active time slot) render here -->
+    <div id="mi-issue-options" style="display:grid;gap:10px;
+         grid-template-columns:repeat(auto-fill,minmax(220px,1fr));"></div>
+  </div>
+
+  <div id="mi-status" style="margin-top:12px;font-size:.85rem;font-weight:600;"></div>
+</div>
 
     <!-- ══════════════════════════════════════════════════
          CARD 1 — CANTEEN SHIFT ENTRY
@@ -184,6 +361,8 @@
          Rates are pre-configured in the Manpower Master
          Rates card on the HR Master Data tab.
     ══════════════════════════════════════════════════ -->
+
+    
     <div class="card">
       <div class="card-title">👷 Daily Manpower Entry</div>
 
@@ -258,6 +437,7 @@
       </div>
     </div><!-- /card: manpower entry -->
 
+    
 
   </div><!-- /container -->
   </div><!-- /tab-security-entry -->
@@ -272,6 +452,125 @@
   ════════════════════════════════════════════════════════ -->
   <div id="tab-hr-master" class="tab-content">
   <div class="container-wide">
+
+    <!-- ══════════════════════════════════════════════════
+     MEAL SYSTEM — STEP 1: SHIFT ROSTER + EMPLOYEE REGISTER
+     Collections: shift_roster, employees
+══════════════════════════════════════════════════ -->
+
+<!-- ── Shift Roster Card ──────────────────────────── -->
+<div class="card">
+  <div class="card-title">🔄 Shift Roster — Rotation Anchor</div>
+
+  <p class="note" style="margin-bottom:14px;">
+    The system auto-flips Shift A / Shift B between Day and Night every week.
+    Set ONE known reference week below — HR only needs to update this if the
+    rotation pattern ever changes (e.g. after a holiday disrupts the cycle).
+  </p>
+
+  <div class="form-grid-small">
+    <div class="field">
+      <label>Anchor Date (any Monday where Shift A = DAY)</label>
+      <input type="date" id="roster-anchor-date"/>
+    </div>
+    <div class="field">
+      <label>Current Status (auto-calculated)</label>
+      <input type="text" id="roster-current-status" readonly/>
+    </div>
+  </div>
+
+  <div class="form-actions">
+    <button class="btn-save" onclick="saveShiftRoster()">💾 Save Anchor</button>
+    <span class="save-status" id="roster-status"></span>
+  </div>
+</div>
+
+<!-- ── Employee Register Card ─────────────────────── -->
+<div class="card">
+  <div class="card-title">🪪 Employee Register</div>
+
+  <div class="form-grid-small" style="margin-bottom:14px;">
+    <div class="field">
+      <label>EPF No (QR Code Value)</label>
+      <input type="text" id="emp-epfno" placeholder="e.g. EPF1234"/>
+    </div>
+    <div class="field">
+      <label>Name</label>
+      <input type="text" id="emp-name" placeholder="Full name"/>
+    </div>
+    <div class="field">
+      <label>Department</label>
+      <select id="emp-dept"><option value="">— select —</option></select>
+    </div>
+    <div class="field">
+      <label>Shift Code (fixed)</label>
+      <select id="emp-shiftcode">
+        <option value="A">Shift A</option>
+        <option value="B">Shift B</option>
+        <option value="General">General</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Type</label>
+      <select id="emp-type">
+        <option value="HomeLiving">Home Living</option>
+        <option value="Boarding">Boarding</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="form-actions">
+    <button class="btn-save" id="emp-save-btn" onclick="saveEmployee()">➕ Add Employee</button>
+    <button class="btn-clear" id="emp-cancel-btn" onclick="cancelEmployeeEdit()" style="display:none;">✕ Cancel</button>
+    <span class="save-status" id="emp-status"></span>
+  </div>
+
+  <!-- Search bar for the employee list -->
+<!-- Search + pagination controls -->
+<div class="form-grid-small" style="margin-top:14px;margin-bottom:10px;">
+  <div class="field">
+    <label>Search by EPF No or Name</label>
+    <input type="text" id="emp-search" placeholder="Type to search…"
+           oninput="emp_currentPage = 1; renderEmployeeTable();"/>
+  </div>
+  <div class="field">
+    <label>Rows per page</label>
+    <select id="emp-page-size" onchange="emp_currentPage = 1; renderEmployeeTable();">
+      <option value="10">10</option>
+      <option value="15" selected>15</option>
+      <option value="25">25</option>
+      <option value="50">50</option>
+    </select>
+  </div>
+</div>
+
+<div class="table-scroll" style="max-height:480px;overflow-y:auto;">
+  <table id="emp-table">
+    <thead style="position:sticky;top:0;z-index:5;">
+      <tr class="th-sub">
+        <th class="left" style="padding:8px 10px;">EPF No</th>
+        <th class="left" style="padding:8px 10px;">Name</th>
+        <th style="padding:8px 10px;">Department</th>
+        <th style="padding:8px 10px;">Shift Code</th>
+        <th style="padding:8px 10px;">Type</th>
+        <th style="padding:8px 10px;">Actions</th>
+      </tr>
+    </thead>
+    <tbody id="emp-table-body">
+      <tr><td colspan="6" class="loading-cell">⏳ Loading…</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- Pagination controls -->
+<div style="display:flex;justify-content:space-between;align-items:center;
+            margin-top:12px;font-size:.82rem;">
+  <span id="emp-page-info" style="color:#5a6e84;"></span>
+  <div style="display:flex;gap:6px;">
+    <button class="btn-clear" onclick="empGoToPage(emp_currentPage - 1)">‹ Prev</button>
+    <button class="btn-clear" onclick="empGoToPage(emp_currentPage + 1)">Next ›</button>
+  </div>
+</div>
 
 
     <!-- ══════════════════════════════════════════════════
