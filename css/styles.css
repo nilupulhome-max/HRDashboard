@@ -34,10 +34,15 @@
   padding: 0;
 }
 
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
 body {
   font-family: 'Segoe UI', Arial, sans-serif;
   background:  #edf1f5;
   font-size:   13px;
+  overflow-x:  hidden;          /* prevents page-level horizontal scroll bleed */
 }
 
 
@@ -218,7 +223,12 @@ header {
 .tabs {
   display: flex;
   padding: 0 20px;
+  overflow-x: auto;                  /* tab strip scrolls instead of squeezing */
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
 }
+
+.tabs::-webkit-scrollbar { display: none; }
 
 .tab {
   background:       transparent;
@@ -231,6 +241,8 @@ header {
   font-weight:      600;
   letter-spacing:   .02em;
   transition:       .15s;
+  white-space:      nowrap;          /* keep tab labels on one line */
+  flex-shrink:      0;
 }
 
 .tab:hover { color: #fff; }
@@ -333,6 +345,18 @@ header {
   display:               grid;
   grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
   gap:                   12px;
+}
+
+.note {
+  margin-bottom: 14px;
+  padding: 10px 14px;
+  background: #fff8e1;
+  border-left: 4px solid #f5a623;
+  border-radius: 4px;
+  font-size: 13px;
+  font-family: 'Segoe UI', Arial, sans-serif;
+  line-height: 1.6;
+  color: #5c4a1a;
 }
 
 .cost-grid {
@@ -556,6 +580,8 @@ header {
   overflow-x:    auto;
   border-radius: 10px;
   box-shadow:    0 2px 10px rgba(0, 0, 0, .07);
+  -webkit-overflow-scrolling: touch;
+  max-width: 100%;
 }
 
 table {
@@ -772,6 +798,9 @@ tfoot tr.grand-row td {
    • Tables use horizontal scroll (never wrap/squeeze)
    • Buttons go full-width for easier tap targets
    • Header stacks vertically
+   • Per-table min-widths instead of one blanket rule, so a
+     5-column table doesn't get stretched to 900px just because
+     the 24-column dashboard table needs more room.
 ════════════════════════════════════════════════════════════ */
 
 @media (max-width: 768px) {
@@ -788,15 +817,33 @@ tfoot tr.grand-row td {
     flex-direction: column;
     align-items:    flex-start;
     gap:            8px;
+    padding:        8px 12px;
   }
 
-  /* Tabs wrap and each takes equal space */
-  .tabs    { flex-wrap: wrap; }
-  .tab     { flex: 1; text-align: center; padding: 10px; font-size: 13px; }
+  .hclock { margin-left: 0; }
+
+  .db-badge { font-size: .68rem; }
+
+  .btn-logout {
+    align-self: stretch;
+    text-align: center;
+  }
+
+  /* Tabs scroll horizontally instead of wrapping/squeezing —
+     each tab keeps its natural width and the strip scrolls */
+  .tabs {
+    flex-wrap: nowrap;
+    padding:   0 10px;
+  }
+  .tab {
+    flex:      0 0 auto;
+    padding:   10px 16px;
+    font-size: 13px;
+  }
 
   /* Cards tighter on mobile */
   .card          { padding: 12px; margin-bottom: 12px; }
-  .card-title    { font-size: 15px; }
+  .card-title    { font-size: 14px; }
 
   /* ── All form grids collapse to a single column ─────────── */
   .form-grid,
@@ -811,19 +858,107 @@ tfoot tr.grand-row td {
   select { width: 100%; font-size: 14px; }
 
   /* Buttons stack vertically and go full width for easy tapping */
-  .form-actions  { flex-direction: column; gap: 8px; }
+  .form-actions  { flex-direction: column; align-items: stretch; gap: 8px; }
   button         { width: 100%; }
 
-  /* ── Tables: always scroll horizontally — never squeeze ─── */
-  .table-scroll {
-    overflow-x:                 auto;
-    -webkit-overflow-scrolling: touch;   /* smooth momentum scroll on iOS */
+  /* ── Filter bar: stack each field + button vertically ───── */
+  .filter-bar {
+    flex-direction: column;
+    align-items:    stretch;
+    padding:        12px;
+  }
+  .field-inline,
+  .btn-apply,
+  .btn-export,
+  .btn-delete {
+    width:      100%;
+    align-self: stretch;
   }
 
-  table  { min-width: 900px; }   /* forces scroll before columns compress */
+  /* ── Tables: always scroll horizontally — never squeeze ───
+     No blanket min-width here. Each table sets its own
+     min-width below, sized to its real column count, so a
+     small 5-column table doesn't get stretched unnecessarily. */
+  .table-scroll {
+    overflow-x:                 auto;
+    -webkit-overflow-scrolling: touch;
+    border-radius: 8px;
+  }
 
-  th, td { font-size: 12px; padding: 6px; white-space: nowrap; }
+  table { min-width: 0; }   /* let small tables size naturally */
+
+  th, td {
+    font-size: 11px;
+    padding:   5px 6px;
+    white-space: nowrap;
+  }
+
+  /* Large/complex tables that genuinely need horizontal scroll
+     keep an explicit min-width — but scaled down from desktop,
+     and each is sized to its own content, not a shared 900px. */
+  #dashTable        { min-width: 1000px; }
+  #att-entry-table  { min-width: 760px;  }
+  #otp-table        { min-width: 900px;  }
+  #otd-dash-table   { min-width: 760px;  }
+  #otd-entry-table  { min-width: 480px;  }
+  #hr-dash-table    { min-width: 760px;  }
+
+  /* Small reference / management tables (rates, summary, master
+     carder list) — these have few columns, so let them size to
+     the viewport instead of forcing 900px of empty space. */
+  #att-master-table,
+  #mp-summary-body,
+  #mp-rates-body,
+  #mp-entry-body {
+    min-width: 0;
+  }
 
   /* Columns marked hide-mobile are removed on small screens */
   .hide-mobile { display: none !important; }
+
+  /* Toast: full-width banner instead of a small floating box,
+     easier to read on a narrow screen */
+  #toast {
+    left:   12px;
+    right:  12px;
+    bottom: 14px;
+    text-align: center;
+  }
+}
+
+
+/* ════════════════════════════════════════════════════════════
+   19. SMALL PHONE FINE-TUNING (≤ 420 px)
+   Extra-narrow phones (most modern phones in portrait) get a
+   bit more breathing room: smaller card padding, smaller card
+   title, and slightly tighter table cells.
+════════════════════════════════════════════════════════════ */
+
+@media (max-width: 420px) {
+  .card        { padding: 10px 10px; }
+  .card-title  { font-size: 13px; }
+
+  .login-box   { width: 92vw; padding: 32px 22px; }
+
+  th, td { padding: 4px 5px; font-size: 10.5px; }
+
+  .tab { padding: 9px 12px; font-size: 12px; }
+}
+
+/* Global overflow guard */
+html, body {
+  overflow-x: hidden;
+  max-width: 100%;
+}
+
+/* Force QR scanner video/canvas to respect container width */
+#mr-qr-reader,
+#mi-qr-reader,
+#mr-qr-reader video,
+#mr-qr-reader canvas,
+#mi-qr-reader video,
+#mi-qr-reader canvas {
+  width: 100% !important;
+  height: auto !important;
+  max-width: 100% !important;
 }
