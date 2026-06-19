@@ -225,28 +225,17 @@ header {
 ════════════════════════════════════════════════════════════ */
 
 .tabs {
-  display: flex;
-  padding: 0 20px;
-  overflow-x: auto;                  /* tab strip scrolls instead of squeezing */
+  flex-wrap: nowrap;
+  padding: 0 10px;
+  overflow-x: auto;
   -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
+  scroll-behavior: smooth;
+  touch-action: pan-y;   /* let JS handle horizontal swipes, not the browser */
 }
-
-.tabs::-webkit-scrollbar { display: none; }
-
 .tab {
-  background:       transparent;
-  color:            rgba(255, 255, 255, .6);
-  border:           none;
-  border-bottom:    3px solid transparent;
-  padding:          9px 22px;
-  cursor:           pointer;
-  font-size:        .87rem;
-  font-weight:      600;
-  letter-spacing:   .02em;
-  transition:       .15s;
-  white-space:      nowrap;          /* keep tab labels on one line */
-  flex-shrink:      0;
+  flex: 0 0 auto;
+  padding: 10px 16px;
+  font-size: 13px;
 }
 
 .tab:hover { color: #fff; }

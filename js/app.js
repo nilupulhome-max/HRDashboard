@@ -4,7 +4,8 @@
 //  SECTIONS (in order):
 //    1.  Live Clock
 //    2.  Firebase Auth — Login / Logout / State Observer
-//    3.  Tab Navigation
+//    3.  Tab Navigation (click)
+//    3a. Tab Navigation — Swipe Gesture (mobile, one tab per swipe)
 //    4.  Default Date & Shift Initialization
 //    5.  Cost Configuration  (Firestore: config/costs)
 //    6.  OT Entry            (Firestore: ot_entries/{date})
@@ -17,6 +18,16 @@
 //   13.  Manpower Summary
 //   14.  Event Listeners
 //   15.  Utility Helpers (toast, formatting)
+//   16.  Attendance — Master Data (Firestore: attendance_masters)
+//   17.  Attendance — Daily Entry (Firestore: attendance_daily)
+//   18.  OT Plan — Monthly Master (Firestore: ot_plans)
+//   19.  OT Daily Entry + Plan vs Actual Dashboard (Firestore: ot_daily)
+//   20.  HR Attendance Dashboard — As Per Date (read-only mirror)
+//   21.  Meal System — Shift Roster (rotation engine)
+//   22.  Meal System — Employee Register (Firestore: employees)
+//   23.  Meal System — Meal Request (Firestore: meal_requests)
+//   24.  Meal System — Daily Meal Request Log
+//   25.  Meal System — Meal Issue
 // ============================================================
 
 
@@ -140,8 +151,8 @@ auth.onAuthStateChanged(user => {
 
 
 // ════════════════════════════════════════════════════════════
-//  3. TAB NAVIGATION
-//  Switches between "Data Entry" and "Dashboard" tabs.
+//  3. TAB NAVIGATION (click)
+//  Switches between top-level tabs.
 //  Auto-loads dashboard data when the Dashboard tab is opened.
 // ════════════════════════════════════════════════════════════
 
@@ -156,7 +167,75 @@ function switchTab(name, btn) {
 
   // Dashboard tab triggers a fresh data load on every visit
   if (name === 'dashboard') loadDashboard();
+
+  // Keep the newly active tab visible inside the scrollable strip
+  // (covers both click and the swipe handler below, which also
+  // calls .click() on a tab button to reuse this same function).
+  btn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
 }
+
+
+// ════════════════════════════════════════════════════════════
+//  3a. TAB NAVIGATION — SWIPE GESTURE (mobile)
+//  On touch devices, swiping left/right on the tab strip moves
+//  exactly ONE tab per swipe — never more, regardless of swipe
+//  speed or distance. This replaces relying on momentum/snap
+//  scrolling, which could overshoot multiple tabs on a fast
+//  swipe. Reuses switchTab() via a real .click() on the target
+//  tab button, so all existing tab-switch logic (dashboard
+//  auto-load, etc.) keeps working untouched.
+// ════════════════════════════════════════════════════════════
+
+(function initTabSwipe() {
+  const tabsEl = document.querySelector('.tabs');
+  if (!tabsEl) return;
+
+  let startX = 0;
+  let startY = 0;
+  let dragging = false;
+
+  const SWIPE_THRESHOLD_PX = 35;   // minimum horizontal distance to count as a swipe
+
+  tabsEl.addEventListener('touchstart', (e) => {
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    dragging = true;
+  }, { passive: true });
+
+  tabsEl.addEventListener('touchend', (e) => {
+    if (!dragging) return;
+    dragging = false;
+
+    const endX  = e.changedTouches[0].clientX;
+    const endY  = e.changedTouches[0].clientY;
+    const diffX = startX - endX;
+    const diffY = startY - endY;
+
+    // Ignore mostly-vertical gestures — that's the user scrolling
+    // the page, not trying to switch tabs.
+    if (Math.abs(diffY) > Math.abs(diffX)) return;
+    if (Math.abs(diffX) < SWIPE_THRESHOLD_PX) return;
+
+    const tabs        = Array.from(tabsEl.querySelectorAll('.tab'));
+    const activeIndex = tabs.findIndex(t => t.classList.contains('active'));
+    if (activeIndex === -1) return;
+
+    let targetIndex = activeIndex;
+    if (diffX > 0 && activeIndex < tabs.length - 1) {
+      targetIndex = activeIndex + 1;   // swiped left  → next tab
+    } else if (diffX < 0 && activeIndex > 0) {
+      targetIndex = activeIndex - 1;   // swiped right → previous tab
+    }
+
+    if (targetIndex !== activeIndex) {
+      tabs[targetIndex].click();   // fires the existing onclick="switchTab(...)"
+    } else {
+      // No tab change (already at an edge) — still re-center
+      // in case the strip drifted slightly during the touch.
+      tabs[targetIndex].scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+    }
+  }, { passive: true });
+})();
 
 
 // ════════════════════════════════════════════════════════════
@@ -1481,8 +1560,9 @@ function toast(msg, err = false) {
   setTimeout(() => t.className = '', 3000);
 }
 
+
 // ════════════════════════════════════════════════════════════
-//  ATTENDANCE — MASTER DATA
+//  16. ATTENDANCE — MASTER DATA
 //  Firestore collection : attendance_masters
 //  Document ID          : "{dept}_{shift}"
 //
@@ -1635,8 +1715,9 @@ async function saveAttMaster() {
   }
 }
 
+
 // ════════════════════════════════════════════════════════════
-//  ATTENDANCE — DAILY ENTRY
+//  17. ATTENDANCE — DAILY ENTRY
 //  Firestore collection : attendance_daily
 //  Document ID          : "{date}"
 //
@@ -1963,8 +2044,9 @@ async function exportAttImage() {
 // ── Wire date change ─────────────────────────────────────────
 document.getElementById('att-date').addEventListener('change', loadAttDaily);
 
+
 // ════════════════════════════════════════════════════════════
-//  OT PLAN — MONTHLY MASTER
+//  18. OT PLAN — MONTHLY MASTER
 //  Firestore collection : ot_plans
 //  Document ID          : "YYYY-MM"  e.g. "2026-05"
 //
@@ -2528,8 +2610,9 @@ async function exportOTPImage() {
   toast('Captured!');
 }
 
+
 // ════════════════════════════════════════════════════════════
-//  OT DAILY ENTRY + PLAN VS ACTUAL DASHBOARD
+//  19. OT DAILY ENTRY + PLAN VS ACTUAL DASHBOARD
 //
 //  Daily Entry:
 //    Collection : ot_daily
@@ -2953,8 +3036,9 @@ async function exportOTDashImage() {
   toast('Captured!');
 }
 
+
 // ════════════════════════════════════════════════════════════
-//  HR ATTENDANCE DASHBOARD — AS PER DATE
+//  20. HR ATTENDANCE DASHBOARD — AS PER DATE
 //  Exact read-only mirror of renderAttEntryTable().
 //  Loads attendance_daily/{date} and renders uneditable.
 //  All calculations identical to daily entry.
@@ -3212,8 +3296,9 @@ async function exportHRDashImage() {
   toast('Captured!');
 }
 
+
 // ════════════════════════════════════════════════════════════
-//  MEAL SYSTEM — STEP 1A: SHIFT ROSTER (rotation engine)
+//  21. MEAL SYSTEM — SHIFT ROSTER (rotation engine)
 //  Firestore collection : shift_roster
 //  Document ID          : "current"  (single document)
 //
@@ -3349,7 +3434,7 @@ function updateRosterStatusDisplay() {
 
 
 // ════════════════════════════════════════════════════════════
-//  MEAL SYSTEM — STEP 1B: EMPLOYEE REGISTER
+//  22. MEAL SYSTEM — EMPLOYEE REGISTER
 //  Firestore collection : employees
 //  Document ID          : EPF No (e.g. "EPF1234")
 //
@@ -3478,10 +3563,6 @@ async function deleteEmployee(epfNo) {
   }
 }
 
-// ── renderEmployeeTable ──────────────────────────────────────
-// Renders the employee list, filtered by the search box if
-// the user has typed anything (matches name or EPF No, case-
-// insensitive, partial match).
 // ── Pagination state for employee table ─────────────────────
 let emp_currentPage = 1;
 
@@ -3589,8 +3670,9 @@ function resetEmployeeForm() {
   document.getElementById('emp-status').textContent       = '';
 }
 
+
 // ════════════════════════════════════════════════════════════
-//  MEAL SYSTEM — STEP 2: MEAL REQUEST
+//  23. MEAL SYSTEM — MEAL REQUEST
 //  Firestore collection : meal_requests
 //  Document ID          : auto
 //
@@ -4015,8 +4097,10 @@ if (forDate === document.getElementById('mrl-date').value) {
   loadMealRequestLog();
 }
 }
+
+
 // ════════════════════════════════════════════════════════════
-//  MEAL SYSTEM — DAILY MEAL REQUEST LOG
+//  24. MEAL SYSTEM — DAILY MEAL REQUEST LOG
 //  Read-only view of all meal_requests for a selected date.
 //  Reuses the same search + pagination pattern as Employee
 //  Register for consistency.
@@ -4182,8 +4266,9 @@ function renderMealRequestLog() {
     `Showing ${showingFrom}–${showingTo} of ${totalRows} employees  •  Page ${mrl_currentPage} of ${totalPages}`;
 }
 
+
 // ════════════════════════════════════════════════════════════
-//  MEAL SYSTEM — STEP 3: MEAL ISSUE
+//  25. MEAL SYSTEM — MEAL ISSUE
 //  Same scan/search flow as Meal Request, but instead of
 //  showing ELIGIBLE meals to request, this shows only the
 //  meal/tea whose TIME SLOT is currently active right now,
@@ -4204,6 +4289,12 @@ function renderMealRequestLog() {
 //       (today for same-day slots, or the relevant date
 //        for overnight slots like Night Tea1/Tea2)
 //    3. status === 'Pending' (not already issued/missed)
+//
+//  NOTE: A "TESTING MODE" block is currently active below,
+//  showing ALL pending requests regardless of time slot.
+//  The production time-slot-restricted logic is preserved at
+//  the bottom of this section, commented out, ready to swap
+//  back in when testing is complete.
 // ════════════════════════════════════════════════════════════
 
 let miCurrentEmployee = null;
@@ -4435,10 +4526,10 @@ async function renderIssueOptions() {
       <div style="font-size:.72rem;color:#888;margin-top:2px;">Tap to Issue</div>
     </button>`;
   }).join('');
-  } 
+}
 
 
-  // ── issueMeal ──────────────────────────────────────────────────
+// ── issueMeal ──────────────────────────────────────────────────
 // Marks a meal_requests document as Issued with a timestamp,
 // then refreshes the issue options view.
 async function issueMeal(docId, label) {
@@ -4460,6 +4551,7 @@ async function issueMeal(docId, label) {
     toast('Issue error: ' + e.message, true);
   }
 }
+
   /* ═══════════════════════════════════════════════════════════
      🔒 PRODUCTION LOGIC (commented out during testing)
      Uncomment this block and delete the TESTING MODE block
@@ -4515,4 +4607,3 @@ async function issueMeal(docId, label) {
   }).join('');
 }
   ═══════════════════════════════════════════════════════════ */
-
