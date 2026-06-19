@@ -3849,8 +3849,13 @@ options.push({ mealType: 'Tea2_Plain', forDate: todayStr, label: 'Tea 2 — Plai
   // ── BOARDING RULES ──────────────────────────────────────────
   if (emp.type === 'Boarding') {
     if (actualShift === 'Day' || actualShift === 'General') {
-      // Day boarding: Lunch always available on entry
-      options.push({ mealType: 'Lunch', forDate: todayStr, label: "Today's Lunch (entry)" });
+      // Day boarding: Lunch (entry) only requestable 6:00 AM – 11:00 AM
+      if (hourDecimal >= 6 && hourDecimal < 11) {
+        options.push({
+          mealType: 'Lunch', forDate: todayStr,
+          label: "Today's Lunch (entry)", deadlineNote: 'Deadline 11:00 AM today'
+        });
+      }
 
       // Today's Dinner — only requestable before 2:00 PM
       if (hourDecimal < 14) {
