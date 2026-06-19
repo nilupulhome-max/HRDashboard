@@ -4435,7 +4435,31 @@ async function renderIssueOptions() {
       <div style="font-size:.72rem;color:#888;margin-top:2px;">Tap to Issue</div>
     </button>`;
   }).join('');
+  } 
 
+
+  // ── issueMeal ──────────────────────────────────────────────────
+// Marks a meal_requests document as Issued with a timestamp,
+// then refreshes the issue options view.
+async function issueMeal(docId, label) {
+  try {
+    await db.collection('meal_requests').doc(docId).update({
+      status:   'Issued',
+      issuedAt: new Date().toISOString()
+    });
+
+    toast(`✔ ${label} issued to ${miCurrentEmployee.name}`);
+    await renderIssueOptions();
+
+    // Refresh the daily log if it's showing today's date
+    const today = dateKey(new Date());
+    if (document.getElementById('mrl-date')?.value === today) {
+      loadMealRequestLog();
+    }
+  } catch (e) {
+    toast('Issue error: ' + e.message, true);
+  }
+}
   /* ═══════════════════════════════════════════════════════════
      🔒 PRODUCTION LOGIC (commented out during testing)
      Uncomment this block and delete the TESTING MODE block
@@ -4489,6 +4513,6 @@ async function renderIssueOptions() {
       <div style="font-size:.72rem;color:#888;margin-top:4px;">Tap to Issue</div>
     </button>`;
   }).join('');
-
-  ═══════════════════════════════════════════════════════════ */
 }
+  ═══════════════════════════════════════════════════════════ */
+

@@ -293,6 +293,27 @@ header {
   letter-spacing: .04em;
 }
 
+/* ── Meal Request / Issue — mobile responsive grid ─────────── */
+@media (max-width: 600px) {
+  #mr-meal-options,
+  #mi-issue-options {
+    grid-template-columns: 1fr !important;
+  }
+
+  #mr-tea-options > div > div {
+    flex-direction: column;
+  }
+
+  .card {
+    padding: 14px 12px;
+  }
+
+  #mr-qr-reader,
+  #mi-qr-reader {
+    max-width: 100% !important;
+  }
+}
+
 
 /* ════════════════════════════════════════════════════════════
    8. FORM GRIDS & FIELDS
