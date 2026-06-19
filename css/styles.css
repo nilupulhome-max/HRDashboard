@@ -966,14 +966,25 @@ tfoot tr.grand-row td {
 }
 
 
-/* Force QR scanner video/canvas to respect container width */
+/* after */
 #mr-qr-reader,
-#mi-qr-reader,
+#mi-qr-reader {
+  width: 100% !important;
+  max-width: 380px !important;
+  overflow: hidden !important;   /* clip anything the library injects wider than the box */
+  box-sizing: border-box;
+}
+
+#mr-qr-reader *,
+#mi-qr-reader * {
+  max-width: 100% !important;    /* catches video, canvas, AND any wrapper/overlay divs */
+  box-sizing: border-box;
+}
+
 #mr-qr-reader video,
 #mr-qr-reader canvas,
 #mi-qr-reader video,
 #mi-qr-reader canvas {
   width: 100% !important;
   height: auto !important;
-  max-width: 100% !important;
 }
