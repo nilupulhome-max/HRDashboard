@@ -831,24 +831,15 @@ tfoot tr.grand-row td {
 
   /* Tabs scroll horizontally instead of wrapping/squeezing —
      each tab keeps its natural width and the strip scrolls */
- @media (max-width: 768px) {
   .tabs {
-    display: flex;
-    flex-wrap: nowrap;          /* don't wrap — let it scroll instead */
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scroll-snap-type: x proximity;
-    width: 100%;
+    flex-wrap: nowrap;
+    padding:   0 10px;
   }
-
   .tab {
-    flex: 0 0 auto;             /* don't stretch — size to content */
-    white-space: nowrap;
-    padding: 10px 16px;
+    flex:      0 0 auto;
+    padding:   10px 16px;
     font-size: 13px;
-    scroll-snap-align: start;
   }
-}
 
   /* Cards tighter on mobile */
   .card          { padding: 12px; margin-bottom: 12px; }
