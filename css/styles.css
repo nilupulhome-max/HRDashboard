@@ -921,7 +921,7 @@ tfoot tr.grand-row td {
   #otp-table        { min-width: 900px;  }
   #otd-dash-table   { min-width: 760px;  }
   #otd-entry-table  { min-width: 480px;  }
-  #hr-dash-table    { min-width: 760px;  }
+  #hrd-table        { min-width: 820px;  }  
 
   /* Small reference / management tables (rates, summary, master
      carder list) — these have few columns, so let them size to
