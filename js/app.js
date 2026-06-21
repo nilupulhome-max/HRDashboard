@@ -4179,7 +4179,31 @@ function mrlGoToPage(page) {
   mrl_currentPage = page;
   renderMealRequestLog();
 }
+// ── Daily totals: Lunch / Dinner / Milk Tea / Plain Tea ───────
+function renderMealRequestTotals() {
+  const totalsEl = document.getElementById('mrl-totals');
+  if (!totalsEl) return; // skip if container not added to HTML yet
 
+  const totals = { Lunch: 0, Dinner: 0, MilkTea: 0, PlainTea: 0 };
+
+  mealRequestLogCache.forEach(r => {
+    switch (r.mealType) {
+      case 'Lunch':      totals.Lunch++;    break;
+      case 'Dinner':     totals.Dinner++;   break;
+      case 'Tea1_Milk':
+      case 'Tea2_Milk':  totals.MilkTea++;  break;
+      case 'Tea1_Plain':
+      case 'Tea2_Plain': totals.PlainTea++; break;
+    }
+  });
+
+  totalsEl.innerHTML = `
+    <span style="margin-right:16px;"><b>🍛 Lunch:</b> ${totals.Lunch}</span>
+    <span style="margin-right:16px;"><b>🍽️ Dinner:</b> ${totals.Dinner}</span>
+    <span style="margin-right:16px;"><b>🍵 Milk Tea:</b> ${totals.MilkTea}</span>
+    <span style="margin-right:16px;"><b>🍃 Plain Tea:</b> ${totals.PlainTea}</span>
+  `;
+}
 // ── renderMealRequestLog ──────────────────────────────────────
 // Groups all requests by EPF No so each employee shows as ONE
 // row per day, with all their requested meals listed together
@@ -4291,6 +4315,7 @@ function renderMealRequestLog() {
   const showingTo   = Math.min(startIdx + pageSize, totalRows);
   document.getElementById('mrl-page-info').textContent =
     `Showing ${showingFrom}–${showingTo} of ${totalRows} employees  •  Page ${mrl_currentPage} of ${totalPages}`;
+    renderMealRequestTotals();
 }
 
 
