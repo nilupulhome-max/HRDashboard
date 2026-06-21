@@ -75,10 +75,39 @@ function logout() {
     .catch(e => toast('Logout error: ' + e.message, true));
 }
 
+// ── applyRoleVisibility ─────────────────────────────────────
+// Hides tab buttons the current role shouldn't see, and forces
+// a safe default tab if the currently active one is hidden.
+function applyRoleVisibility(role) {
+  const tabButtons = document.querySelectorAll('.tabs .tab');
+  // Must match the order of <button class="tab"> elements in index.html
+  const tabOrder = ['security-entry','hr-master','hr-entry','ie-entry','dashboards','admin'];
+
+  tabButtons.forEach((btn, i) => {
+    const tabName = tabOrder[i];
+    let visible = true;
+    if (role === 'security') {
+      visible = (tabName === 'security-entry');
+    } else if (role === 'hr') {
+      visible = (tabName !== 'admin');
+    }
+    // admin (or unknown/unset role) sees everything
+    btn.style.display = visible ? '' : 'none';
+  });
+
+  // If the currently active tab just got hidden, switch to the first visible one
+  const activeBtn = document.querySelector('.tabs .tab.active');
+  if (activeBtn && activeBtn.style.display === 'none') {
+    const firstVisible = Array.from(tabButtons).find(b => b.style.display !== 'none');
+    if (firstVisible) firstVisible.click();
+  }
+}
+
 // ── Auth State Observer ──────────────────────────────────────
 // Fires automatically when the user's authentication state
 // changes (login, logout, page refresh with an active session).
-// On login  → show app, update badge, seed all data.
+// On login  → show app, update badge, fetch role, seed data
+//             appropriate to that role.
 // On logout → show login screen.
 auth.onAuthStateChanged(user => {
   if (user) {
@@ -96,49 +125,70 @@ auth.onAuthStateChanged(user => {
     badge.className   = 'db-badge connected';
     badge.textContent = '🟢 Connected';
 
-    // Load all data then auto-trigger all dashboards for today
-    loadCosts().then(async () => {
+    // ── Fetch role, apply tab visibility, then load only the
+    //    data that role is permitted (and needs) to see ────────
+    db.collection('users').doc(user.uid).get().then(roleDoc => {
+      const role = roleDoc.exists ? roleDoc.data().role : null;
+      window.currentUserRole = role;
+      applyRoleVisibility(role);
 
-      // ── Masters ──────────────────────────────────────────
-      await loadMpRates();
-      await loadAttMasters();
-      await loadShiftRoster();
-      await loadEmployees();
+      if (role === 'security') {
+        // Security only sees the Security Data Entry tab:
+        // meal request / log / issue + manpower entry.
+        // Skip everything that needs HR-only Firestore reads
+        // (costs, manpower rates, attendance, shift roster,
+        // OT, dashboards) to avoid permission errors.
+        loadEmployees();
+        loadMpEntry();
+        initMealRequestLog();
+        updateActiveSlotBanner();
+        return;
+      }
 
-      // ── Daily entries (today) ────────────────────────────
-      loadMpEntry();
-      loadOTEntry();
-      initAttDailyDate();   // sets today + loads attendance entry
-      initOTPlan();         // sets current month in OT plan picker
-      initOTDaily();        // sets today in OT daily picker
-      initMealRequestLog();
-      updateActiveSlotBanner();
+      // ── Admin / HR (or unset role): load everything as before ──
+      loadCosts().then(async () => {
 
-      // ── Auto-load all dashboards for today ───────────────
-      const now = new Date();
-      const pad = n => String(n).padStart(2, '0');
-      const today = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
-      const month = `${now.getFullYear()}-${pad(now.getMonth()+1)}`;
+        // ── Masters ──────────────────────────────────────────
+        await loadMpRates();
+        await loadAttMasters();
+        await loadShiftRoster();
+        await loadEmployees();
 
-      // Canteen dashboard — uses f-from / f-to already set by initDates()
-      loadDashboard();
+        // ── Daily entries (today) ────────────────────────────
+        loadMpEntry();
+        loadOTEntry();
+        initAttDailyDate();   // sets today + loads attendance entry
+        initOTPlan();         // sets current month in OT plan picker
+        initOTDaily();        // sets today in OT daily picker
+        initMealRequestLog();
+        updateActiveSlotBanner();
 
-      // Manpower summary
-      document.getElementById('mp-from').value = `${now.getFullYear()}-${pad(now.getMonth()+1)}-01`;
-      document.getElementById('mp-to').value   = today;
-      loadMpSummary();
+        // ── Auto-load all dashboards for today ───────────────
+        const now = new Date();
+        const pad = n => String(n).padStart(2, '0');
+        const today = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
+        const month = `${now.getFullYear()}-${pad(now.getMonth()+1)}`;
 
-      // HR Attendance dashboard
-      document.getElementById('hrd-date').value = today;
-      loadHRDashboard();
+        // Canteen dashboard — uses f-from / f-to already set by initDates()
+        loadDashboard();
 
-      // OT Plan vs Actual dashboard
-      document.getElementById('otd-dash-month').value = month;
-      loadOTDashboard();
+        // Manpower summary
+        document.getElementById('mp-from').value = `${now.getFullYear()}-${pad(now.getMonth()+1)}-01`;
+        document.getElementById('mp-to').value   = today;
+        loadMpSummary();
 
-      // OT daily entry — load today
-      document.getElementById('otd-date').value = today;
-      loadOTDaily();
+        // HR Attendance dashboard
+        document.getElementById('hrd-date').value = today;
+        loadHRDashboard();
+
+        // OT Plan vs Actual dashboard
+        document.getElementById('otd-dash-month').value = month;
+        loadOTDashboard();
+
+        // OT daily entry — load today
+        document.getElementById('otd-date').value = today;
+        loadOTDaily();
+      });
     });
 
   } else {
