@@ -1117,43 +1117,118 @@ async function exportImage() {
 // ════════════════════════════════════════════════════════════
 
 async function clearRangeRecords() {
-  const from = document.getElementById('f-from').value;
-  const to   = document.getElementById('f-to').value;
+  const from     = document.getElementById('admin-clear-from').value;
+  const to       = document.getElementById('admin-clear-to').value;
+  const statusEl = document.getElementById('admin-clear-status');
 
   if (!from || !to) { toast('Select a date range first', true); return; }
 
-  // Require explicit confirmation — this action is irreversible
   const confirmed = confirm(
-    `⚠️ This will permanently delete ALL records from ${from} to ${to}.\n\n` +
-    `Includes: Canteen, OT, Manpower entries.\n\nAre you sure?`
+    `⚠️ This will permanently delete ALL Canteen, OT and Manpower records from ${from} to ${to}.\n\nThis cannot be undone. Are you sure?`
   );
   if (!confirmed) return;
 
-  toast('Deleting…');
+  statusEl.style.color = '#5a6e84';
+  statusEl.textContent = '⏳ Deleting…';
 
   try {
     const collections = ['records', 'ot_entries', 'manpower_entries'];
+    let totalDeleted = 0;
 
-    // Delete from each collection within the date range
     for (const col of collections) {
+      statusEl.textContent = `⏳ Clearing ${col}…`;
       const snap = await db.collection(col)
         .where('date', '>=', from)
         .where('date', '<=', to)
         .get();
 
-      // Batch all deletes for this collection into a single commit
       const batch = db.batch();
       snap.forEach(d => batch.delete(d.ref));
       await batch.commit();
+      totalDeleted += snap.size;
     }
 
-    toast('✔ All records deleted for selected range!');
+    statusEl.style.color = '#1e8449';
+    statusEl.textContent = `✔ Deleted ${totalDeleted} record(s) from ${from} to ${to}.`;
+    toast('✔ Records cleared!');
 
-    // Clear the in-memory cache and refresh the (now empty) table
+    // Refresh dashboard table if it has data loaded
     dashData = [];
     renderTable();
 
   } catch (e) {
+    statusEl.style.color = '#c0392b';
+    statusEl.textContent = 'Error: ' + e.message;
+    toast('Error: ' + e.message, true);
+  }
+}
+
+// ── clearEntireDatabase ──────────────────────────────────────
+// Deletes every document from all data collections.
+// users collection is intentionally excluded — wiping it would
+// lock everyone out of the application.
+async function clearEntireDatabase() {
+  const ALL_CLEAR_COLLECTIONS = [
+    'records', 'ot_entries', 'manpower_entries',
+    'attendance_daily', 'ot_daily', 'ot_plans',
+    'meal_requests', 'config', 'attendance_masters',
+    'manpower_rates', 'employees', 'shift_roster',
+  ];
+
+  const statusEl = document.getElementById('admin-clear-all-status');
+
+  // Double-confirm — this is the most destructive action in the app
+  const first = confirm(
+    '☠ COMPLETE DATABASE CLEAR\n\n' +
+    'This will permanently delete EVERY document from all data collections.\n\n' +
+    'Collections affected:\n' + ALL_CLEAR_COLLECTIONS.join(', ') + '\n\n' +
+    'User accounts will NOT be deleted.\n\n' +
+    'Are you absolutely sure you want to continue?'
+  );
+  if (!first) return;
+
+  const second = confirm(
+    'FINAL WARNING\n\nThis action CANNOT be undone.\n\nClick OK to permanently wipe the entire database.'
+  );
+  if (!second) return;
+
+  statusEl.style.color = '#5a6e84';
+  statusEl.textContent = '⏳ Clearing…';
+
+  let totalDeleted = 0;
+  const skipped    = [];
+
+  try {
+    for (const col of ALL_CLEAR_COLLECTIONS) {
+      statusEl.textContent = `⏳ Clearing ${col}…`;
+      try {
+        const snap  = await db.collection(col).get();
+        const batch = db.batch();
+        snap.forEach(d => batch.delete(d.ref));
+        await batch.commit();
+        totalDeleted += snap.size;
+      } catch (colErr) {
+        console.warn(`clearEntireDatabase: skipping "${col}" — ${colErr.message}`);
+        skipped.push(col);
+      }
+    }
+
+    let msg = `✔ Done — ${totalDeleted} document(s) deleted.`;
+    if (skipped.length) msg += ` Skipped (permission denied): ${skipped.join(', ')}.`;
+    statusEl.style.color = skipped.length ? '#d68910' : '#1e8449';
+    statusEl.textContent  = msg;
+    toast('Database cleared!');
+
+    // Reset in-memory caches that other tabs rely on
+    dashData   = [];
+    attMasters = {};
+    mpRates    = [];
+    renderTable();
+
+  } catch (e) {
+    console.error('clearEntireDatabase:', e);
+    statusEl.style.color = '#c0392b';
+    statusEl.textContent = 'Error: ' + e.message;
     toast('Error: ' + e.message, true);
   }
 }
@@ -3154,6 +3229,10 @@ async function loadHRDashboard() {
         longabsent:    s.longabsent    || 0,
         turnover:      s.turnover      || 0,
         recruitment:   s.recruitment   || 0,
+        // Snapshot values saved at entry time — preserved so master changes
+        // don't retroactively alter historical dashboard figures.
+        revised:       s.revised       != null ? s.revised  : null,
+        onRoll:        s.onRoll        != null ? s.onRoll   : null,
       };
     });
 
@@ -3189,7 +3268,9 @@ function renderHRDashTable(rowData) {
     const key         = `${dept}_${shift}`;
     const r           = rowData[key]    || {};
     const master      = attMasters[key] || { onRoll: 0 };
-    const onRoll      = master.onRoll   || 0;
+    // Prefer snapshotted onRoll saved at entry time; fall back to live master
+    // for records saved before snapshotting was introduced.
+    const onRoll      = (r.onRoll != null ? r.onRoll : master.onRoll) || 0;
     const totalAbsent = (r.informed || 0) + (r.uninformed || 0);
     const shiftAbsPct = onRoll > 0 ? (totalAbsent / onRoll) * 100 : 0;
 
@@ -3218,8 +3299,10 @@ function renderHRDashTable(rowData) {
     const master = attMasters[key] || { revised: 0, onRoll: 0 };
     const meta   = deptMeta[dept];
 
-    const revised     = master.revised || 0;
-    const onRoll      = master.onRoll  || 0;
+    // Use snapshotted values from entry time; fall back to live master for
+    // records saved before snapshotting was introduced.
+    const revised     = (r.revised != null ? r.revised : master.revised) || 0;
+    const onRoll      = (r.onRoll  != null ? r.onRoll  : master.onRoll)  || 0;
     const totalAbsent = (r.informed || 0) + (r.uninformed || 0);
     const excess      = onRoll - revised;
     const tvPct       = onRoll > 0
@@ -5078,5 +5161,218 @@ async function deleteAdminDoc(docId) {
   } catch (e) {
     console.error('deleteAdminDoc:', e);
     toast('Delete error: ' + e.message, true);
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+//  26.  Backup & Restore — Firestore
+//  Backup  : reads every document from all known collections
+//            and downloads as a timestamped JSON file.
+//  Restore : reads a previously-downloaded backup file and
+//            writes every document back using batched sets.
+//            Existing documents are overwritten; documents not
+//            in the file are left untouched.
+// ════════════════════════════════════════════════════════════
+
+const BACKUP_COLLECTIONS = [
+  'records',
+  'manpower_entries',
+  'ot_entries',
+  'attendance_daily',
+  'ot_daily',
+  'ot_plans',
+  'meal_requests',
+  'config',
+  'attendance_masters',
+  'manpower_rates',
+  'employees',
+  'shift_roster',
+  'users',
+];
+
+// ── backupFirestore ──────────────────────────────────────────
+async function backupFirestore() {
+  const btn      = document.getElementById('btn-backup');
+  const statusEl = document.getElementById('backup-status');
+  btn.disabled   = true;
+  statusEl.style.color = '#5a6e84';
+  statusEl.textContent = '⏳ Reading collections…';
+
+  try {
+    const backup  = { exportedAt: new Date().toISOString(), version: 1, collections: {} };
+    const skipped = [];
+
+    for (const col of BACKUP_COLLECTIONS) {
+      statusEl.textContent = `⏳ Reading ${col}…`;
+      try {
+        const snap = await db.collection(col).get();
+        backup.collections[col] = {};
+        snap.forEach(doc => { backup.collections[col][doc.id] = doc.data(); });
+      } catch (colErr) {
+        // Firestore rules may block listing certain collections (e.g. users).
+        // Skip and note it rather than aborting the whole backup.
+        console.warn(`backupFirestore: skipping "${col}" — ${colErr.message}`);
+        skipped.push(col);
+      }
+    }
+
+    const json  = JSON.stringify(backup, null, 2);
+    const blob  = new Blob([json], { type: 'application/json' });
+    const url   = URL.createObjectURL(blob);
+    const ts    = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const a     = document.createElement('a');
+    a.href      = url;
+    a.download  = `hr-dashboard-backup-${ts}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    const included  = Object.keys(backup.collections);
+    const totalDocs = included.reduce((n, c) => n + Object.keys(backup.collections[c]).length, 0);
+
+    let msg = `✔ Backup downloaded — ${totalDocs} documents across ${included.length} collections.`;
+    if (skipped.length) {
+      msg += ` (skipped — permission denied: ${skipped.join(', ')})`;
+      statusEl.style.color = '#d68910';
+    } else {
+      statusEl.style.color = '#1e8449';
+    }
+    statusEl.textContent = msg;
+    toast('Backup downloaded!');
+  } catch (e) {
+    console.error('backupFirestore:', e);
+    statusEl.style.color = '#c0392b';
+    statusEl.textContent = 'Error: ' + e.message;
+    toast('Backup error: ' + e.message, true);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ── previewRestore ───────────────────────────────────────────
+// Called when the user picks a file — validates the JSON and
+// shows a summary before the Restore button is enabled.
+let _restoreData = null;
+
+function previewRestore(event) {
+  const file      = event.target.files[0];
+  const nameEl    = document.getElementById('restore-file-name');
+  const previewEl = document.getElementById('restore-preview');
+  const previewTx = document.getElementById('restore-preview-text');
+  const statusEl  = document.getElementById('restore-status');
+  const btn       = document.getElementById('btn-restore');
+
+  _restoreData    = null;
+  btn.disabled    = true;
+  statusEl.textContent = '';
+  previewEl.style.display = 'none';
+
+  if (!file) { nameEl.textContent = 'No file selected'; return; }
+  nameEl.textContent = file.name;
+
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!data.version || !data.collections || !data.exportedAt) {
+        throw new Error('Not a valid HR Dashboard backup file.');
+      }
+
+      const cols    = Object.keys(data.collections);
+      const totalDocs = cols.reduce((n, c) => n + Object.keys(data.collections[c]).length, 0);
+      const exported  = new Date(data.exportedAt).toLocaleString('en-LK');
+
+      previewTx.innerHTML =
+        `<strong>Exported:</strong> ${exported}<br>` +
+        `<strong>Collections:</strong> ${cols.join(', ')}<br>` +
+        `<strong>Total documents:</strong> ${totalDocs}`;
+
+      previewEl.style.display = 'block';
+      _restoreData = data;
+      btn.disabled = false;
+    } catch (err) {
+      previewEl.style.display = 'none';
+      statusEl.style.color    = '#c0392b';
+      statusEl.textContent    = '✖ ' + err.message;
+    }
+  };
+  reader.readAsText(file);
+}
+
+// ── restoreFirestore ─────────────────────────────────────────
+// Writes every document in the backup back to Firestore using
+// batched sets. Firestore batches are capped at 500 ops each.
+async function restoreFirestore() {
+  if (!_restoreData) return;
+
+  const cols      = Object.keys(_restoreData.collections);
+  const totalDocs = cols.reduce((n, c) => n + Object.keys(_restoreData.collections[c]).length, 0);
+
+  if (!confirm(
+    `This will overwrite ${totalDocs} documents across ${cols.length} collections.\n\n` +
+    `Existing documents in Firestore that are NOT in the backup file will be left as-is.\n\n` +
+    `This cannot be undone. Proceed?`
+  )) return;
+
+  const btn      = document.getElementById('btn-restore');
+  const statusEl = document.getElementById('restore-status');
+  btn.disabled   = true;
+  statusEl.style.color = '#5a6e84';
+
+  try {
+    let written = 0;
+    const skipped = [];
+
+    for (const col of cols) {
+      const docs = _restoreData.collections[col];
+      const entries = Object.entries(docs);
+      if (!entries.length) continue;
+
+      // Write each collection in its own set of batches so a permission failure
+      // on one collection doesn't roll back documents already committed.
+      let batch      = db.batch();
+      let batchCount = 0;
+
+      const flushBatch = async () => {
+        if (batchCount === 0) return;
+        await batch.commit();
+        batch      = db.batch();
+        batchCount = 0;
+      };
+
+      try {
+        for (const [docId, data] of entries) {
+          statusEl.textContent = `⏳ Restoring ${col}/${docId}…`;
+          batch.set(db.collection(col).doc(docId), data);
+          batchCount++;
+          if (batchCount >= 490) await flushBatch();
+        }
+        await flushBatch();
+        written += entries.length;
+      } catch (colErr) {
+        console.warn(`restoreFirestore: skipping "${col}" — ${colErr.message}`);
+        skipped.push(col);
+      }
+    }
+
+    let msg = `✔ Restored ${written} documents successfully.`;
+    if (skipped.length) {
+      msg += ` (skipped — permission denied: ${skipped.join(', ')})`;
+      statusEl.style.color = '#d68910';
+    } else {
+      statusEl.style.color = '#1e8449';
+    }
+    statusEl.textContent = msg;
+    toast('Restore complete!');
+    _restoreData = null;
+    btn.disabled = true;
+    document.getElementById('restore-file-input').value = '';
+    document.getElementById('restore-file-name').textContent = 'No file selected';
+    document.getElementById('restore-preview').style.display = 'none';
+  } catch (e) {
+    console.error('restoreFirestore:', e);
+    statusEl.style.color = '#c0392b';
+    statusEl.textContent = 'Restore error: ' + e.message;
+    toast('Restore error: ' + e.message, true);
+    btn.disabled = false;
   }
 }

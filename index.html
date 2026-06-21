@@ -1120,9 +1120,6 @@
         <!-- Screenshots the full dashboard table as a high-res PNG -->
         <button class="btn-export" onclick="exportImage()">📷 Export Image</button>
 
-        <!-- Permanently deletes all records in the selected date range
-             across records, ot_entries, and manpower_entries collections -->
-        <button class="btn-delete" id="clearBtn" onclick="clearRangeRecords()">🗑 Clear Records</button>
       </div><!-- /filter-bar -->
 
       <!-- ── MAIN DASHBOARD TABLE ────────────────────────────
@@ -1362,7 +1359,109 @@
           </tbody>
         </table>
       </div>
+
+      <!-- ── DANGER ZONE: CLEAR RECORDS ─────────────────────────── -->
+      <div style="margin-top:24px;border-top:2px solid #e74c3c;padding-top:18px;">
+        <div style="font-weight:700;font-size:1rem;color:#c0392b;margin-bottom:14px;">
+          🗑 Danger Zone — Delete Records
+        </div>
+
+        <!-- Option 1: Date range -->
+        <div style="background:#fdedec;border:1px solid #f5b7b1;border-radius:8px;padding:14px 16px;margin-bottom:14px;">
+          <div style="font-weight:700;font-size:.9rem;color:#922b21;margin-bottom:6px;">
+            Option 1 — Clear by Date Range
+          </div>
+          <p class="note" style="margin-bottom:12px;color:#922b21;">
+            Permanently deletes all <strong>Canteen</strong>, <strong>OT</strong> and
+            <strong>Manpower</strong> entries within the selected dates. Cannot be undone.
+          </p>
+          <div style="display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap;margin-bottom:10px;">
+            <div class="field">
+              <label>From</label>
+              <input type="date" id="admin-clear-from">
+            </div>
+            <div class="field">
+              <label>To</label>
+              <input type="date" id="admin-clear-to">
+            </div>
+            <button class="btn-delete" onclick="clearRangeRecords()"
+                    style="padding:8px 18px;font-size:.9rem;align-self:flex-end;">
+              🗑 Clear Records in Range
+            </button>
+          </div>
+          <div id="admin-clear-status" style="font-size:.85rem;font-weight:600;"></div>
+        </div>
+
+        <!-- Option 2: Complete database clear -->
+        <div style="background:#fdf2f8;border:2px solid #c0392b;border-radius:8px;padding:14px 16px;">
+          <div style="font-weight:700;font-size:.9rem;color:#7b241c;margin-bottom:6px;">
+            Option 2 — Complete Database Clear
+          </div>
+          <p class="note" style="margin-bottom:12px;color:#7b241c;">
+            Wipes <strong>every document</strong> from all data collections
+            (Canteen, OT, Manpower, Attendance, OT Plans, Meal Requests, Employees,
+            Rates, Config, Roster). User accounts are preserved.
+            This is <strong>irreversible</strong>.
+          </p>
+          <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+            <button class="btn-delete" onclick="clearEntireDatabase()"
+                    style="padding:8px 20px;font-size:.9rem;background:#7b241c;">
+              ☠ Clear Entire Database
+            </button>
+            <span id="admin-clear-all-status" style="font-size:.85rem;font-weight:600;"></span>
+          </div>
+        </div>
+
+      </div>
+
     </div><!-- /card: admin transaction data browser -->
+
+    <!-- ── CARD: BACKUP & RESTORE ──────────────────────────────── -->
+    <div class="card" style="margin-top:18px;">
+      <div class="card-title">💾 Backup & Restore — Firestore Database</div>
+
+      <p class="note" style="margin-bottom:16px;color:#7a5a00;background:#fffbe6;border:1px solid #ffe58f;padding:10px 14px;border-radius:6px;">
+        ⚠ <strong>Backup</strong> downloads all Firestore data as a JSON file.
+        <strong>Restore</strong> overwrites every matching document with the backup data — it does <em>not</em> delete documents that aren't in the file.
+        Keep backups in a safe place; restores cannot be undone.
+      </p>
+
+      <!-- Backup -->
+      <div style="margin-bottom:20px;">
+        <div style="font-weight:700;font-size:.95rem;margin-bottom:8px;color:#2c3e50;">📤 Backup</div>
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+          <button class="btn-apply" onclick="backupFirestore()" id="btn-backup">
+            ⬇ Download Backup
+          </button>
+          <span id="backup-status" style="font-size:.85rem;font-weight:600;"></span>
+        </div>
+      </div>
+
+      <!-- Restore -->
+      <div>
+        <div style="font-weight:700;font-size:.95rem;margin-bottom:8px;color:#2c3e50;">📥 Restore</div>
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
+          <label class="btn-apply" style="cursor:pointer;margin:0;">
+            📂 Choose Backup File
+            <input type="file" id="restore-file-input" accept=".json"
+                   style="display:none;" onchange="previewRestore(event)">
+          </label>
+          <span id="restore-file-name" style="font-size:.85rem;color:#5a6e84;font-style:italic;">No file selected</span>
+        </div>
+        <div id="restore-preview" style="display:none;margin-bottom:12px;">
+          <div style="font-size:.85rem;background:#f4f7fb;border:1px solid #c8d8e8;border-radius:6px;padding:10px 14px;">
+            <span id="restore-preview-text"></span>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+          <button class="btn-delete" onclick="restoreFirestore()" id="btn-restore" disabled
+                  style="padding:8px 18px;font-size:.9rem;">
+            ⚠ Restore to Firestore
+          </button>
+          <span id="restore-status" style="font-size:.85rem;font-weight:600;"></span>
+        </div>
+      </div>
+    </div><!-- /card: backup & restore -->
 
   </div><!-- /container-wide -->
   </div><!-- /tab-admin -->
