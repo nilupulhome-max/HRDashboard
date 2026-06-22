@@ -3984,18 +3984,17 @@ function getMealEligibility(emp, now) {
   // Current hour as decimal (e.g. 14.5 = 2:30pm) for deadline checks
   const hourDecimal = now.getHours() + now.getMinutes() / 60;
 
-  // ── Tea — both Tea 1 and Tea 2 offer a Milk/Plain choice ────
-// Each slot shows two separate options so the employee can
-// pick exactly one tea type per slot.
-options.push({ mealType: 'Tea1_Milk',  forDate: todayStr, label: 'Tea 1 — Milk Tea'  });
-options.push({ mealType: 'Tea1_Plain', forDate: todayStr, label: 'Tea 1 — Plain Tea' });
-options.push({ mealType: 'Tea2_Milk',  forDate: todayStr, label: 'Tea 2 — Milk Tea'  });
-options.push({ mealType: 'Tea2_Plain', forDate: todayStr, label: 'Tea 2 — Plain Tea' });
-
   // ── HOME LIVING RULES ──────────────────────────────────────
   if (emp.type === 'HomeLiving') {
     if (actualShift === 'Day' || actualShift === 'General') {
-      options.push({ mealType: 'Lunch', forDate: todayStr, label: "Today's Lunch" });
+      // Lunch + Tea 1 + Tea 2 — requestable 6:00 AM – 11:00 AM
+      if (hourDecimal >= 6 && hourDecimal < 11) {
+        options.push({ mealType: 'Lunch',      forDate: todayStr, label: "Today's Lunch",      deadlineNote: 'Deadline 11:00 AM today' });
+        options.push({ mealType: 'Tea1_Milk',  forDate: todayStr, label: 'Tea 1 — Milk Tea',   deadlineNote: 'Deadline 11:00 AM today' });
+        options.push({ mealType: 'Tea1_Plain', forDate: todayStr, label: 'Tea 1 — Plain Tea',  deadlineNote: 'Deadline 11:00 AM today' });
+        options.push({ mealType: 'Tea2_Milk',  forDate: todayStr, label: 'Tea 2 — Milk Tea',   deadlineNote: 'Deadline 11:00 AM today' });
+        options.push({ mealType: 'Tea2_Plain', forDate: todayStr, label: 'Tea 2 — Plain Tea',  deadlineNote: 'Deadline 11:00 AM today' });
+      }
     } else if (actualShift === 'Night') {
       options.push({ mealType: 'Dinner', forDate: todayStr, label: "Today's Dinner" });
     }
@@ -4004,12 +4003,16 @@ options.push({ mealType: 'Tea2_Plain', forDate: todayStr, label: 'Tea 2 — Plai
   // ── BOARDING RULES ──────────────────────────────────────────
   if (emp.type === 'Boarding') {
     if (actualShift === 'Day' || actualShift === 'General') {
-      // Day boarding: Lunch (entry) only requestable 6:00 AM – 11:00 AM
+      // Lunch + Tea 1 + Tea 2 — requestable 6:00 AM – 11:00 AM
       if (hourDecimal >= 6 && hourDecimal < 11) {
         options.push({
           mealType: 'Lunch', forDate: todayStr,
           label: "Today's Lunch (entry)", deadlineNote: 'Deadline 11:00 AM today'
         });
+        options.push({ mealType: 'Tea1_Milk',  forDate: todayStr, label: 'Tea 1 — Milk Tea',  deadlineNote: 'Deadline 11:00 AM today' });
+        options.push({ mealType: 'Tea1_Plain', forDate: todayStr, label: 'Tea 1 — Plain Tea', deadlineNote: 'Deadline 11:00 AM today' });
+        options.push({ mealType: 'Tea2_Milk',  forDate: todayStr, label: 'Tea 2 — Milk Tea',  deadlineNote: 'Deadline 11:00 AM today' });
+        options.push({ mealType: 'Tea2_Plain', forDate: todayStr, label: 'Tea 2 — Plain Tea', deadlineNote: 'Deadline 11:00 AM today' });
       }
 
       // Today's Dinner — only requestable before 2:00 PM
@@ -4028,8 +4031,17 @@ options.push({ mealType: 'Tea2_Plain', forDate: todayStr, label: 'Tea 2 — Plai
         });
       }
     } else if (actualShift === 'Night') {
-      // Night boarding: Dinner on entry to shift
-      options.push({ mealType: 'Dinner', forDate: todayStr, label: "Tonight's Dinner (entry)" });
+      // Night boarding: Dinner + Tea 1 + Tea 2 — requestable 6:00 PM – 8:00 PM
+      if (hourDecimal >= 18 && hourDecimal < 20) {
+        options.push({
+          mealType: 'Dinner', forDate: todayStr,
+          label: "Tonight's Dinner (entry)", deadlineNote: 'Deadline 8:00 PM today'
+        });
+        options.push({ mealType: 'Tea1_Milk',  forDate: todayStr, label: 'Tea 1 — Milk Tea',  deadlineNote: 'Deadline 8:00 PM today' });
+        options.push({ mealType: 'Tea1_Plain', forDate: todayStr, label: 'Tea 1 — Plain Tea', deadlineNote: 'Deadline 8:00 PM today' });
+        options.push({ mealType: 'Tea2_Milk',  forDate: todayStr, label: 'Tea 2 — Milk Tea',  deadlineNote: 'Deadline 8:00 PM today' });
+        options.push({ mealType: 'Tea2_Plain', forDate: todayStr, label: 'Tea 2 — Plain Tea', deadlineNote: 'Deadline 8:00 PM today' });
+      }
 
       // Tomorrow's Breakfast + Lunch — only requestable before 9:00 PM
       if (hourDecimal < 21) {
