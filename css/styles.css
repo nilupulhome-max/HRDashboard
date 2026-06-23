@@ -36,24 +36,25 @@
 
 html {
   -webkit-text-size-adjust: 100%;
-  overflow-x: hidden;
-  width: 100%;
+  overflow-x:          hidden;
+  width:               100%;
+  overscroll-behavior-x: none;   /* iOS 16+: stops elastic horizontal bounce */
 }
 
 body {
-  font-family: 'Segoe UI', Arial, sans-serif;
-  background:  #edf1f5;
-  font-size:   13px;
-  overflow-x:  hidden;
-  width:       100%;
-  max-width:   100vw;
-  position:    relative;
+  font-family:         'Segoe UI', Arial, sans-serif;
+  background:          #edf1f5;
+  font-size:           13px;
+  overflow-x:          hidden;
+  width:               100%;
+  max-width:           100vw;
+  position:            relative;
+  overscroll-behavior-x: none;   /* prevents horizontal rubber-band on iOS/Android */
 }
 
 /* Prevent date/month inputs from ever overflowing their container.
-   Browsers compute a minimum intrinsic width for these based on the
-   formatted date string + calendar button, which exceeds narrow
-   mobile columns without this constraint. */
+   WebKit (iOS Chrome/Firefox/Safari) computes a minimum intrinsic
+   width for date inputs that can exceed narrow card columns. */
 input[type="date"],
 input[type="month"] {
   min-width:  0;
@@ -289,9 +290,12 @@ header {
    Only the .active panel is visible at any time.
 ════════════════════════════════════════════════════════════ */
 
+#loginScreen,
 #appContent {
-  overflow-x: hidden;
-  max-width:  100%;
+  overflow-x:            hidden;
+  max-width:             100vw;
+  width:                 100%;
+  overscroll-behavior-x: none;
 }
 
 .tab-content         { display: none; }
@@ -305,13 +309,17 @@ header {
 ════════════════════════════════════════════════════════════ */
 
 .container {
-  max-width: 900px;
-  margin:    0 auto;
-  padding:   20px 16px 40px;
+  max-width:  900px;
+  margin:     0 auto;
+  padding:    20px 16px 40px;
+  width:      100%;
+  overflow-x: hidden;
 }
 
 .container-wide {
-  padding: 20px 16px 40px;
+  padding:    20px 16px 40px;
+  width:      100%;
+  overflow-x: hidden;
 }
 
 
@@ -407,6 +415,8 @@ header {
   display:        flex;
   flex-direction: column;
   gap:            5px;
+  min-width:      0;       /* allow grid cell to shrink */
+  overflow:       hidden;  /* clip any child that escapes the field boundary */
 }
 
 /* Small all-caps label above each control */
@@ -557,6 +567,8 @@ header {
   display:        flex;
   flex-direction: column;
   gap:            4px;
+  min-width:      0;
+  overflow:       hidden;
 }
 
 .field-inline label {
