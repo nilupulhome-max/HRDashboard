@@ -102,14 +102,14 @@ input[type="month"] {
   margin-bottom: 20px;
 }
 
-/* Email and password inputs */
+/* Email and password inputs — 16px prevents iOS auto-zoom on tap */
 .login-box input {
   display:       block;
   width:         100%;
   padding:       11px 14px;
   border:        1px solid #d0d8e4;
   border-radius: 8px;
-  font-size:     .9rem;
+  font-size:     16px;
   margin-bottom: 12px;
   outline:       none;
   background:    #f8fafc;
@@ -917,24 +917,27 @@ tfoot tr.grand-row td {
     gap: 10px;
   }
 
-  /* Inputs full width for comfortable typing */
+  /* 16px minimum prevents iOS from auto-zooming the viewport when
+     an input is tapped — anything below 16px triggers iOS auto-zoom
+     which shifts/cuts off the page after the keyboard appears */
   input,
-  select {
+  select,
+  textarea {
     width:      100%;
     min-width:  0;
     max-width:  100%;
-    font-size:  14px;
+    font-size:  16px !important;
     box-sizing: border-box;
   }
 
-  /* Extra guard for date/month pickers — their calendar button can push
-     outside the field on narrow screens without this */
+  /* Date/month inputs: remove native browser chrome (the chevron/calendar
+     button) that WebKit renders outside the input's box model and overflows
+     the card on mobile. The native iOS date/month picker still opens on tap
+     because type="date"/"month" controls picker behaviour, not appearance. */
   input[type="date"],
   input[type="month"] {
-    width:      100%;
-    min-width:  0;
-    max-width:  100%;
-    box-sizing: border-box;
+    -webkit-appearance: none;
+    appearance:         none;
   }
 
   /* Buttons stack vertically and go full width for easy tapping */
