@@ -4382,25 +4382,27 @@ function mrlGoToPage(page) {
   mrl_currentPage = page;
   renderMealRequestLog();
 }
-// ── Daily totals: Lunch / Dinner / Milk Tea / Plain Tea ───────
+// ── Daily totals: Breakfast / Lunch / Dinner / Milk Tea / Plain Tea ──
 function renderMealRequestTotals() {
   const totalsEl = document.getElementById('mrl-totals');
   if (!totalsEl) return; // skip if container not added to HTML yet
 
-  const totals = { Lunch: 0, Dinner: 0, MilkTea: 0, PlainTea: 0 };
+  const totals = { Breakfast: 0, Lunch: 0, Dinner: 0, MilkTea: 0, PlainTea: 0 };
 
   mealRequestLogCache.forEach(r => {
     switch (r.mealType) {
-      case 'Lunch':      totals.Lunch++;    break;
-      case 'Dinner':     totals.Dinner++;   break;
+      case 'Breakfast':  totals.Breakfast++; break;
+      case 'Lunch':      totals.Lunch++;     break;
+      case 'Dinner':     totals.Dinner++;    break;
       case 'Tea1_Milk':
-      case 'Tea2_Milk':  totals.MilkTea++;  break;
+      case 'Tea2_Milk':  totals.MilkTea++;   break;
       case 'Tea1_Plain':
-      case 'Tea2_Plain': totals.PlainTea++; break;
+      case 'Tea2_Plain': totals.PlainTea++;  break;
     }
   });
 
   totalsEl.innerHTML = `
+    <span style="margin-right:16px;"><b>🍳 Breakfast:</b> ${totals.Breakfast}</span>
     <span style="margin-right:16px;"><b>🍛 Lunch:</b> ${totals.Lunch}</span>
     <span style="margin-right:16px;"><b>🍽️ Dinner:</b> ${totals.Dinner}</span>
     <span style="margin-right:16px;"><b>🍵 Milk Tea:</b> ${totals.MilkTea}</span>
