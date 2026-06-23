@@ -50,6 +50,18 @@ body {
   position:    relative;
 }
 
+/* Prevent date/month inputs from ever overflowing their container.
+   Browsers compute a minimum intrinsic width for these based on the
+   formatted date string + calendar button, which exceeds narrow
+   mobile columns without this constraint. */
+input[type="date"],
+input[type="month"] {
+  min-width:  0;
+  max-width:  100%;
+  width:      100%;
+  box-sizing: border-box;
+}
+
 
 /* ════════════════════════════════════════════════════════════
    2. LOGIN SCREEN
@@ -418,6 +430,9 @@ header {
   background:    #f8fafc;
   outline:       none;
   width:         100%;
+  min-width:     0;        /* allow date/month inputs to shrink below intrinsic size */
+  max-width:     100%;
+  box-sizing:    border-box;
   transition:    .15s;
 }
 
@@ -554,12 +569,21 @@ header {
 
 .field-inline input,
 .field-inline select {
-  padding:       8px 10px;
-  border:        1px solid #d0d8e4;
+  padding:    8px 10px;
+  border:     1px solid #d0d8e4;
   border-radius: 6px;
-  font-size:     .85rem;
-  background:    #f8fafc;
-  outline:       none;
+  font-size:  .85rem;
+  background: #f8fafc;
+  outline:    none;
+  width:      100%;
+  min-width:  0;
+  max-width:  100%;
+  box-sizing: border-box;
+}
+
+.field-inline {
+  min-width: 0;
+  max-width: 100%;
 }
 
 /* "Refresh Dashboard" button */
@@ -903,7 +927,23 @@ tfoot tr.grand-row td {
 
   /* Inputs full width for comfortable typing */
   input,
-  select { width: 100%; font-size: 14px; }
+  select {
+    width:      100%;
+    min-width:  0;
+    max-width:  100%;
+    font-size:  14px;
+    box-sizing: border-box;
+  }
+
+  /* Extra guard for date/month pickers — their calendar button can push
+     outside the field on narrow screens without this */
+  input[type="date"],
+  input[type="month"] {
+    width:      100%;
+    min-width:  0;
+    max-width:  100%;
+    box-sizing: border-box;
+  }
 
   /* Buttons stack vertically and go full width for easy tapping */
   .form-actions  { flex-direction: column; align-items: stretch; gap: 8px; }
