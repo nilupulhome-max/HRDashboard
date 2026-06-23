@@ -930,14 +930,14 @@ tfoot tr.grand-row td {
     box-sizing: border-box;
   }
 
-  /* Date/month inputs: remove native browser chrome (the chevron/calendar
-     button) that WebKit renders outside the input's box model and overflows
-     the card on mobile. The native iOS date/month picker still opens on tap
-     because type="date"/"month" controls picker behaviour, not appearance. */
+  /* Date/month inputs: WebKit renders the native picker button OUTSIDE the
+     input's box model, causing it to overflow the card. Making the input
+     20px narrower than its container gives the button room to render within
+     the card's right padding area without clipping or overflow. */
   input[type="date"],
   input[type="month"] {
-    -webkit-appearance: none;
-    appearance:         none;
+    width:     calc(100% - 20px);
+    max-width: calc(100% - 20px);
   }
 
   /* Buttons stack vertically and go full width for easy tapping */
