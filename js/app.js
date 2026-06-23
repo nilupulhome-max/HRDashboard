@@ -4048,7 +4048,13 @@ function getMealEligibility(emp, now) {
         options.push({ mealType: 'Tea2_Plain', forDate: todayStr, label: 'Tea 2 — Plain Tea',  deadlineNote: 'Deadline 11:00 AM today' });
       }
     } else if (actualShift === 'Night') {
-      options.push({ mealType: 'Dinner', forDate: todayStr, label: "Today's Dinner" });
+      // Dinner requestable 6:00 PM – 8:00 PM (same window as boarding night)
+      if (hourDecimal >= 18 && hourDecimal < 20) {
+        options.push({
+          mealType: 'Dinner', forDate: todayStr,
+          label: "Today's Dinner", deadlineNote: 'Deadline 8:00 PM today'
+        });
+      }
     }
   }
 
