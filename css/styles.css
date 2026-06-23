@@ -903,7 +903,8 @@ tfoot tr.grand-row td {
   color:         #666;
   padding:       4px 8px;
   border-radius: 6px;
-  width:         auto;
+  width:         auto !important;  /* override mobile button { width: 100% } */
+  flex-shrink:   0;
 }
 .qr-overlay-close:hover { background: #f0f0f0; }
 

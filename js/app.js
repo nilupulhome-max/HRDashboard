@@ -3945,6 +3945,10 @@ async function toggleQRScanner() {
   btn.textContent = '✕ Stop Camera';
   mrScannerActive = true;
 
+  // Wait one frame so the browser paints the overlay before html5-qrcode
+  // measures the container — otherwise it sees 0×0 and renders nothing
+  await new Promise(r => setTimeout(r, 80));
+
   mrQrScanner = new Html5Qrcode('mr-qr-reader');
 
   try {
@@ -4642,6 +4646,8 @@ async function toggleIssueQRScanner() {
   overlay.classList.add('active');
   btn.textContent = '✕ Stop Camera';
   miScannerActive = true;
+
+  await new Promise(r => setTimeout(r, 80));
 
   miQrScanner = new Html5Qrcode('mi-qr-reader');
 
