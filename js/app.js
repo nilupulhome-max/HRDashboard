@@ -140,6 +140,7 @@ auth.onAuthStateChanged(user => {
         // OT, dashboards) to avoid permission errors.
         loadEmployees();
         loadMpEntry();
+        loadCanteenShiftTable();
         initMealRequestLog();
         updateActiveSlotBanner();
         return;
@@ -156,6 +157,7 @@ auth.onAuthStateChanged(user => {
 
         // ── Daily entries (today) ────────────────────────────
         loadMpEntry();
+        loadCanteenShiftTable();
         loadOTEntry();
         initAttDailyDate();   // sets today + loads attendance entry
         initOTPlan();         // sets current month in OT plan picker
@@ -657,6 +659,7 @@ async function saveRecord() {
     await docRef.set(data);
     toast('✔ Saved!');
     document.getElementById('e-qty').value = 0;
+    loadCanteenShiftTable();
   } catch (e) {
     toast('Save error: ' + e.message, true);
   }
@@ -671,6 +674,51 @@ function clearForm() {
   document.getElementById('field-qty').style.display         = 'none';
   document.getElementById('field-biscuitCode').style.display = 'none';
   document.getElementById('e-qty').value = 0;
+}
+
+// ── loadCanteenShiftTable ─────────────────────────────────────
+// Reads the records document for the current date+shift and
+// renders all saved supplier/item/qty rows into the entry table.
+async function loadCanteenShiftTable() {
+  const date  = document.getElementById('e-date').value;
+  const shift = document.getElementById('e-shift').value;
+  const tbody = document.getElementById('canteen-entry-body');
+  if (!date || !shift) return;
+
+  try {
+    const doc = await db.collection('records').doc(`${date}_${shift}`).get();
+    if (!doc.exists) {
+      tbody.innerHTML = '<tr><td colspan="3" class="loading-cell">No entries yet for this date / shift.</td></tr>';
+      return;
+    }
+
+    const suppliers = doc.data().suppliers || {};
+    const rows = [];
+    for (const [supplier, items] of Object.entries(suppliers)) {
+      for (const [key, val] of Object.entries(items)) {
+        if (key === 'biscuitType') continue;
+        if (key === 'biscuitQty') {
+          rows.push({ supplier, item: `Biscuit (${items.biscuitType || '—'})`, qty: val });
+        } else {
+          rows.push({ supplier, item: itemLabels[key] || key, qty: val });
+        }
+      }
+    }
+
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="3" class="loading-cell">No entries yet for this date / shift.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = rows.map(r => `
+      <tr>
+        <td class="left" style="padding:6px 8px;">${r.supplier}</td>
+        <td style="padding:6px 8px;text-align:center;">${r.item}</td>
+        <td style="padding:6px 8px;text-align:center;font-weight:700;">${r.qty}</td>
+      </tr>`).join('');
+  } catch (e) {
+    console.error('loadCanteenShiftTable:', e);
+  }
 }
 
 
@@ -1655,9 +1703,9 @@ document.getElementById('ot-date').addEventListener('change', loadOTEntry);
 document.getElementById('e-supplier').addEventListener('change', renderSupplierFields);
 // Show qty field and pre-fill when item changes
 document.getElementById('e-itemType').addEventListener('change', renderItemFields);
-// Pre-fill form when date or shift changes (in case there's an existing record)
-document.getElementById('e-date').addEventListener('change',  loadEntryForm);
-document.getElementById('e-shift').addEventListener('change', loadEntryForm);
+// Pre-fill form and refresh entry table when date or shift changes
+document.getElementById('e-date').addEventListener('change',  () => { loadEntryForm(); loadCanteenShiftTable(); });
+document.getElementById('e-shift').addEventListener('change', () => { loadEntryForm(); loadCanteenShiftTable(); });
 
 // ── Manpower Entry ────────────────────────────────────────────
 // Reload rows when date changes

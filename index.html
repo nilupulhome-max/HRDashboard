@@ -357,6 +357,22 @@
         <!-- Resets supplier, item, qty fields without touching date/shift -->
         <button class="btn-clear" onclick="clearForm()">✕ Clear</button>
       </div>
+
+      <!-- Entries saved for the selected date+shift -->
+      <div class="table-scroll" style="margin-top:14px;">
+        <table>
+          <thead>
+            <tr class="th-sub">
+              <th class="left" style="padding:8px 10px;min-width:130px;">Supplier</th>
+              <th style="padding:8px 10px;">Item</th>
+              <th style="padding:8px 10px;">Qty</th>
+            </tr>
+          </thead>
+          <tbody id="canteen-entry-body">
+            <tr><td colspan="3" class="loading-cell">No entries yet for this date / shift.</td></tr>
+          </tbody>
+        </table>
+      </div>
     </div><!-- /card: canteen shift entry -->
 
 
