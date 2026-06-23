@@ -859,6 +859,54 @@ tfoot tr.grand-row td {
      the 24-column dashboard table needs more room.
 ════════════════════════════════════════════════════════════ */
 
+/* ── QR Scanner overlay ─────────────────────────────────────────
+   Fixed fullscreen backdrop so the camera is always centred on
+   screen regardless of scroll position. Works on both mobile and
+   desktop but designed mainly for mobile use.
+════════════════════════════════════════════════════════════ */
+.qr-overlay {
+  display:         none;
+  position:        fixed;
+  inset:           0;
+  z-index:         1000;
+  background:      rgba(0, 0, 0, 0.82);
+  align-items:     center;
+  justify-content: center;
+  padding:         20px;
+}
+.qr-overlay.active {
+  display: flex;
+}
+.qr-overlay-box {
+  background:    #fff;
+  border-radius: 14px;
+  padding:       16px;
+  width:         100%;
+  max-width:     400px;
+  box-shadow:    0 8px 32px rgba(0, 0, 0, .4);
+}
+.qr-overlay-header {
+  display:         flex;
+  justify-content: space-between;
+  align-items:     center;
+  margin-bottom:   12px;
+  font-weight:     600;
+  font-size:       .95rem;
+  color:           #1a3a5c;
+}
+.qr-overlay-close {
+  background:    none;
+  border:        none;
+  font-size:     1.3rem;
+  line-height:   1;
+  cursor:        pointer;
+  color:         #666;
+  padding:       4px 8px;
+  border-radius: 6px;
+  width:         auto;
+}
+.qr-overlay-close:hover { background: #f0f0f0; }
+
 @media (max-width: 768px) {
 
   /* Slightly larger base font on small screens */

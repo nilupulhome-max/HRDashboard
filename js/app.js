@@ -3925,8 +3925,8 @@ let mrScannerActive = false;
 // automatically and stops the camera to save battery/avoid
 // duplicate scans.
 async function toggleQRScanner() {
-  const readerDiv = document.getElementById('mr-qr-reader');
-  const btn       = document.getElementById('mr-scan-toggle-btn');
+  const overlay = document.getElementById('mr-qr-overlay');
+  const btn     = document.getElementById('mr-scan-toggle-btn');
 
   if (mrScannerActive) {
     // ── Stop scanning ──────────────────────────────────────
@@ -3934,14 +3934,14 @@ async function toggleQRScanner() {
       await mrQrScanner.stop().catch(() => {});
       mrQrScanner.clear();
     }
-    readerDiv.style.display = 'none';
+    overlay.classList.remove('active');
     btn.textContent = '📷 Start Camera Scan';
     mrScannerActive = false;
     return;
   }
 
   // ── Start scanning ────────────────────────────────────────
-  readerDiv.style.display = 'block';
+  overlay.classList.add('active');
   btn.textContent = '✕ Stop Camera';
   mrScannerActive = true;
 
@@ -3960,7 +3960,7 @@ async function toggleQRScanner() {
     );
   } catch (e) {
     toast('Camera error: ' + e.message + ' — use manual entry instead', true);
-    readerDiv.style.display = 'none';
+    overlay.classList.remove('active');
     btn.textContent = '📷 Start Camera Scan';
     mrScannerActive = false;
   }
@@ -4625,21 +4625,21 @@ setInterval(updateActiveSlotBanner, 30000);
 // separate scanner instance so Request and Issue tabs don't
 // conflict if both happen to be open.
 async function toggleIssueQRScanner() {
-  const readerDiv = document.getElementById('mi-qr-reader');
-  const btn       = document.getElementById('mi-scan-toggle-btn');
+  const overlay = document.getElementById('mi-qr-overlay');
+  const btn     = document.getElementById('mi-scan-toggle-btn');
 
   if (miScannerActive) {
     if (miQrScanner) {
       await miQrScanner.stop().catch(() => {});
       miQrScanner.clear();
     }
-    readerDiv.style.display = 'none';
+    overlay.classList.remove('active');
     btn.textContent = '📷 Start Camera Scan';
     miScannerActive = false;
     return;
   }
 
-  readerDiv.style.display = 'block';
+  overlay.classList.add('active');
   btn.textContent = '✕ Stop Camera';
   miScannerActive = true;
 
@@ -4657,7 +4657,7 @@ async function toggleIssueQRScanner() {
     );
   } catch (e) {
     toast('Camera error: ' + e.message + ' — use manual entry instead', true);
-    readerDiv.style.display = 'none';
+    overlay.classList.remove('active');
     btn.textContent = '📷 Start Camera Scan';
     miScannerActive = false;
   }

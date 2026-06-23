@@ -8,7 +8,7 @@
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏭</text></svg>"/>
 
   <!-- ── Styles ──────────────────────────────────────────────── -->
-  <link rel="stylesheet" href="css/styles.css?v=8"/>
+  <link rel="stylesheet" href="css/styles.css?v=9"/>
 
   <!-- ── Third-party scripts ─────────────────────────────────── -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -131,8 +131,7 @@
       </div>
 
     
-      <!-- QR scanner renders here when active -->
-      <div id="mr-qr-reader" style="max-width:380px;margin:0 auto 16px;display:none;"></div>
+      <!-- QR scanner opens as a centred overlay (see #mr-qr-overlay below) -->
 
       <!-- Employee result card — shown after successful lookup -->
       <div id="mr-employee-card" style="display:none;background:#eef3f9;
@@ -256,8 +255,7 @@
         </div>
       </div>
 
-      <!-- QR scanner renders here when active -->
-      <div id="mi-qr-reader" style="max-width:380px;margin:0 auto 16px;display:none;"></div>
+      <!-- QR scanner opens as a centred overlay (see #mi-qr-overlay below) -->
 
       <!-- Employee result card -->
       <div id="mi-employee-card" style="display:none;background:#eef3f9;
@@ -1489,6 +1487,31 @@
      .show.err = red   (error)no
 ──────────────────────────────────────────────────────────── -->
 <div id="toast"></div>
+
+<!-- ── QR SCANNER OVERLAYS ──────────────────────────────────────
+     Fixed fullscreen modals so the camera appears centred on screen
+     regardless of scroll position. Opened/closed by toggleQRScanner()
+     and toggleIssueQRScanner() in app.js.
+──────────────────────────────────────────────────────────── -->
+<div id="mr-qr-overlay" class="qr-overlay">
+  <div class="qr-overlay-box">
+    <div class="qr-overlay-header">
+      <span>📷 Scan Employee QR</span>
+      <button class="qr-overlay-close" onclick="toggleQRScanner()">✕</button>
+    </div>
+    <div id="mr-qr-reader"></div>
+  </div>
+</div>
+
+<div id="mi-qr-overlay" class="qr-overlay">
+  <div class="qr-overlay-box">
+    <div class="qr-overlay-header">
+      <span>📷 Scan Employee QR</span>
+      <button class="qr-overlay-close" onclick="toggleIssueQRScanner()">✕</button>
+    </div>
+    <div id="mi-qr-reader"></div>
+  </div>
+</div>
 
 <!-- App scripts — at the END of body, after all elements exist -->
 <script src="js/firebase-config.js"></script>
